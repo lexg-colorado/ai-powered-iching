@@ -73,6 +73,7 @@ Thumbs.db
 # ========================
 .idea/
 .vscode/
+.obsidian/
 *.swp
 *.swo
 *~
@@ -81,3 +82,4 @@ Thumbs.db
 # Claude Code
 # ========================
 .claude/settings.local.json
+CLAUDE.md

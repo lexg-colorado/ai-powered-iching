@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iching"
+version = "0.1.0"
+description = "I Ching Divination CLI"
+requires-python = ">=3.11"
+dependencies = [
+    "openai",
+    "chromadb",
+    "pydantic",
+    "python-dotenv",
+    "rich",
+]
+
+[project.scripts]
+iching = "iching.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["iching*"]
+
+[tool.setuptools.package-data]
+iching = ["Data/*.json", "Data/*.md"]

@@ -1,0 +1,83 @@
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+*.so
+
+# Virtual environment
+venv/
+.venv/
+
+# ========================
+# Node.js / Next.js
+# ========================
+node_modules/
+.next/
+out/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.vercel
+
+# ========================
+# Environment & secrets
+# ========================
+.env
+.env.local
+.env.*.local
+
+# ========================
+# ChromaDB persistent storage
+# ========================
+chroma_data/
+
+# ========================
+# Divination / consultation history
+# (readings, logs, and personal session data)
+# ========================
+readings/
+history/
+consultations/
+*.reading.json
+*.consultation.json
+reading_history.*
+consultation_log.*
+
+# ========================
+# OS files
+# ========================
+.DS_Store
+Thumbs.db
+*.pem
+
+# ========================
+# IDE / editor
+# ========================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ========================
+# Claude Code
+# ========================
+.claude/settings.local.json

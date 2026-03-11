@@ -1,10 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import type { ClientCastResult } from "@/lib/hexagram";
 import { LINE_INFO } from "@/lib/hexagram";
 import HexagramDisplay from "./HexagramDisplay";
 import type { LineValue } from "@/lib/types";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import { wrapCollapsibleSections } from "@/lib/markdownTransform";
 
 interface ReadingResultProps {
   castResult: ClientCastResult;
@@ -31,6 +34,13 @@ export default function ReadingResult({
       return val as LineValue;
     }
   );
+
+  // Only apply collapsible transform after streaming completes to avoid flicker
+  const processedInterpretation = useMemo(() => {
+    if (!interpretation) return "";
+    if (isStreaming) return interpretation;
+    return wrapCollapsibleSections(interpretation);
+  }, [interpretation, isStreaming]);
 
   return (
     <div className="flex flex-col gap-8 animate-fade-in">
@@ -127,6 +137,11 @@ export default function ReadingResult({
             Nuclear: #{nuclear.king_wen} {nuclear.name} / {nuclear.title}
           </p>
         )}
+        {castResult.zongGua && (
+          <p className="text-xs text-muted mt-1">
+            Zong Gua: #{castResult.zongGua.king_wen} {castResult.zongGua.name} / {castResult.zongGua.title}
+          </p>
+        )}
       </div>
 
       {/* Interpretation */}
@@ -135,15 +150,26 @@ export default function ReadingResult({
           Reading Interpretation
         </h3>
         <div className="prose prose-neutral max-w-none text-foreground/90 text-base leading-relaxed">
-          {interpretation ? (
+          {processedInterpretation ? (
             <ReactMarkdown
+              rehypePlugins={[rehypeRaw]}
               components={{
                 h1: ({ children }) => <h1 className="font-heading">{children}</h1>,
                 h2: ({ children }) => <h2 className="font-heading">{children}</h2>,
                 h3: ({ children }) => <h3 className="font-heading">{children}</h3>,
+                details: ({ children }) => (
+                  <details className="my-4 border border-border rounded-lg overflow-hidden">
+                    {children}
+                  </details>
+                ),
+                summary: ({ children }) => (
+                  <summary className="cursor-pointer px-4 py-2 bg-surface hover:bg-surface/80 font-heading text-sm font-semibold text-muted select-none">
+                    {children}
+                  </summary>
+                ),
               }}
             >
-              {interpretation}
+              {processedInterpretation}
             </ReactMarkdown>
           ) : isStreaming ? (
             <p className="text-muted italic">Consulting the oracle...</p>

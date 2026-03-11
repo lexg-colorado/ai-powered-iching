@@ -121,6 +121,7 @@ async def cmd_lookup(session: Session, args: str):
         "relating": "Relating Hexagram",
         "nuclear_primary": "Nuclear Hexagram (Primary)",
         "nuclear_relating": "Nuclear Hexagram (Relating)",
+        "zong_gua": "Zong Gua (Complement)",
     }
 
     for key, docs in passages.items():

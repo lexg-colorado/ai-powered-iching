@@ -269,4 +269,10 @@ def get_reading_passages(cast: CastResult) -> dict[str, list[dict]]:
                 rel_nuc.king_wen, ["overview", "judgment"],
             )
 
+    # 6. Zong Gua (complement) of primary
+    if cast.zong_gua:
+        passages["zong_gua"] = _hex_passages(
+            cast.zong_gua.king_wen, ["overview", "judgment"],
+        )
+
     return passages

@@ -215,6 +215,24 @@ async def retrieve_reading_passages(
                     expected_hex=rel_nuc.king_wen,
                 )
 
+    # 6. Zong Gua (complement) of primary
+    if cast.zong_gua:
+        zong = cast.zong_gua
+        zong_query = (
+            f"hexagram {zong.king_wen} {zong.name} {zong.title} "
+            f"judgment image overall meaning"
+        )
+        zong_filter = {"hexagram_number": zong.king_wen}
+        passages["zong_gua"] = await _query_collection(
+            collection, zong_query, n_results=4, where=zong_filter,
+            expected_hex=zong.king_wen,
+        )
+        if not passages["zong_gua"]:
+            passages["zong_gua"] = await _query_collection(
+                collection, zong_query, n_results=4,
+                expected_hex=zong.king_wen,
+            )
+
     return passages
 
 
@@ -287,6 +305,14 @@ def build_interpretation_prompt(
                 f"Nuclear Hexagram of Relating -- #{rel_nuc.king_wen} {rel_nuc.name} / {rel_nuc.title} (hidden inner dynamic)",
             ))
 
+    # Zong Gua (complement hexagram)
+    if cast.zong_gua and passages.get("zong_gua"):
+        zong = cast.zong_gua
+        context_parts.append(_passages_text(
+            passages["zong_gua"],
+            f"Zong Gua (Complement) -- #{zong.king_wen} {zong.name} / {zong.title} (polar opposite / shadow)",
+        ))
+
     retrieved_text = "\n".join(context_parts)
 
     system_prompt = (
@@ -296,10 +322,16 @@ def build_interpretation_prompt(
         "2. Interpret each changing line in order from bottom to top, noting what stage "
         "of the process it represents.\n"
         "3. Discuss the relating hexagram as the direction the situation moves toward.\n"
-        "4. If nuclear hexagram passages are provided, conclude with the nuclear hexagram(s) "
+        "4. If nuclear hexagram passages are provided, discuss the nuclear hexagram(s) "
         "as the hidden inner dynamic -- the unconscious undercurrent or deeper structural "
         "tendency beneath the surface of the situation. The nuclear hexagram reveals what "
-        "persists beneath the changes.\n\n"
+        "persists beneath the changes. Include the hexagram number in the heading, e.g. "
+        "'### Nuclear Hexagram of Primary (54): Kuei Mei / The Marrying Maiden'.\n"
+        "5. If Zong Gua (complement) passages are provided, conclude with the Zong Gua "
+        "as the polar opposite -- the shadow or inverse quality that provides contrast "
+        "and deeper understanding. The Zong Gua reveals what the situation is NOT, and "
+        "by contrast, what it fundamentally IS. Include the hexagram number in the heading, "
+        "e.g. '### Zong Gua (Complement) (44): Kou / Coming to Meet'.\n\n"
         "Use the retrieved passages as your source material. If passages are missing, "
         "acknowledge it gracefully. Speak with clarity and wisdom, not mysticism. "
         "Keep the reading grounded and practical."
@@ -316,6 +348,8 @@ def build_interpretation_prompt(
         rel_nuc = nuclear_hexagram(cast.relating.binary)
         if rel_nuc:
             user_content += f"Nuclear (relating): Hexagram {rel_nuc.king_wen} -- {rel_nuc.name} / {rel_nuc.title}\n"
+    if cast.zong_gua:
+        user_content += f"Zong Gua (complement): Hexagram {cast.zong_gua.king_wen} -- {cast.zong_gua.name} / {cast.zong_gua.title}\n"
     user_content += f"\n{situation}\n"
 
     if question:
@@ -404,5 +438,9 @@ def format_reading_header(cast: CastResult, question: str | None = None) -> str:
         rel_nuc = nuclear_hexagram(cast.relating.binary)
         if rel_nuc:
             header += f"\nNuclear (relating): #{rel_nuc.king_wen} {rel_nuc.name} / {rel_nuc.title}"
+
+    if cast.zong_gua:
+        zong = cast.zong_gua
+        header += f"\nZong Gua (complement): #{zong.king_wen} {zong.name} / {zong.title}"
 
     return header

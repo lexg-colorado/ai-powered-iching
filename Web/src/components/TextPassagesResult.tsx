@@ -13,6 +13,7 @@ const SECTION_LABELS: Record<string, string> = {
   relating: "Relating Hexagram",
   nuclear_primary: "Nuclear Hexagram (Primary)",
   nuclear_relating: "Nuclear Hexagram (Relating)",
+  zong_gua: "Zong Gua (Complement)",
 };
 
 function sectionLabel(key: string): string {
@@ -29,7 +30,7 @@ export default function TextPassagesResult({
 
   // Order sections: primary first, then lines in order, then relating, then nuclear
   const orderedKeys = Object.keys(passages).sort((a, b) => {
-    const order = ["primary", "line_1", "line_2", "line_3", "line_4", "line_5", "line_6", "relating", "nuclear_primary", "nuclear_relating"];
+    const order = ["primary", "line_1", "line_2", "line_3", "line_4", "line_5", "line_6", "relating", "nuclear_primary", "nuclear_relating", "zong_gua"];
     return order.indexOf(a) - order.indexOf(b);
   });
 

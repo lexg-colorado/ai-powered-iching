@@ -60,6 +60,7 @@ class CastResult:
     relating: HexagramInfo | None  # the resulting hexagram (None if no changes)
     change_mask: str             # 6-bit mask showing which lines change
     nuclear: HexagramInfo | None  # nuclear (mutual) hexagram of the primary
+    zong_gua: HexagramInfo | None  # complement hexagram (all lines inverted)
 
 
 # Module-level cache
@@ -213,9 +214,9 @@ def nuclear_trigrams(binary: str) -> tuple[str, str]:
     Lower nuclear = lines 2-3-4, Upper nuclear = lines 3-4-5.
     Binary string is MSB-first: index 0=line6, 1=line5, 2=line4, 3=line3, 4=line2, 5=line1.
     """
-    # line N is at index (6 - N)
-    lower_nuclear = binary[4] + binary[3] + binary[2]  # lines 2,3,4
-    upper_nuclear = binary[3] + binary[2] + binary[1]  # lines 3,4,5
+    # line N is at index (6 - N), trigram key is MSB-first (top of trigram first)
+    lower_nuclear = binary[2] + binary[3] + binary[4]  # lines 4,3,2 (top-to-bottom)
+    upper_nuclear = binary[1] + binary[2] + binary[3]  # lines 5,4,3 (top-to-bottom)
     return lower_nuclear, upper_nuclear
 
 
@@ -362,6 +363,7 @@ def build_cast_result(line_values: list[int]) -> CastResult:
         relating = _by_binary.get(relating_binary)
 
     nuc = nuclear_hexagram(primary_binary) if primary else None
+    zong = complement(primary_binary) if primary else None
 
     return CastResult(
         line_values=line_values,
@@ -370,6 +372,7 @@ def build_cast_result(line_values: list[int]) -> CastResult:
         relating=relating,
         change_mask=mask,
         nuclear=nuc,
+        zong_gua=zong,
     )
 
 

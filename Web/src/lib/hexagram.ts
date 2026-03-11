@@ -95,8 +95,9 @@ export function trigramName(bits: string): string {
 export function nuclearTrigrams(binary: string): [string, string] {
   // Lower nuclear = lines 2,3,4; Upper nuclear = lines 3,4,5
   // Binary MSB-first: index 0=line6, 1=line5, 2=line4, 3=line3, 4=line2, 5=line1
-  const lowerNuclear = binary[4] + binary[3] + binary[2];
-  const upperNuclear = binary[3] + binary[2] + binary[1];
+  // Trigram key is MSB-first (top of trigram first)
+  const lowerNuclear = binary[2] + binary[3] + binary[4]; // lines 4,3,2 (top-to-bottom)
+  const upperNuclear = binary[1] + binary[2] + binary[3]; // lines 5,4,3 (top-to-bottom)
   return [lowerNuclear, upperNuclear];
 }
 
@@ -104,6 +105,14 @@ export function nuclearHexagram(binary: string): HexagramData | undefined {
   const [lower, upper] = nuclearTrigrams(binary);
   const nuclearBinary = upper + lower;
   return _byBinary.get(nuclearBinary);
+}
+
+export function complementHexagram(binary: string): HexagramData | undefined {
+  const inverted = binary
+    .split("")
+    .map((b) => (b === "0" ? "1" : "0"))
+    .join("");
+  return _byBinary.get(inverted);
 }
 
 // ---- Cast result building ----
@@ -115,6 +124,7 @@ export interface ClientCastResult {
   relating: HexagramData | null;
   changeMask: string;
   nuclear: HexagramData | null;
+  zongGua: HexagramData | null;
 }
 
 /**
@@ -162,6 +172,7 @@ export function buildCastResult(lineValues: number[]): ClientCastResult | null {
   }
 
   const nuclear = nuclearHexagram(primaryBinary) ?? null;
+  const zongGua = complementHexagram(primaryBinary) ?? null;
 
   return {
     lineValues,
@@ -170,6 +181,7 @@ export function buildCastResult(lineValues: number[]): ClientCastResult | null {
     relating,
     changeMask: mask,
     nuclear,
+    zongGua,
   };
 }
 

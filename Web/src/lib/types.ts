@@ -16,6 +16,7 @@ export interface CastResponse {
   relating: HexagramData | null;
   change_mask: string;
   nuclear: HexagramData | null;
+  zong_gua: HexagramData | null;
 }
 
 export interface ReadingRequest {

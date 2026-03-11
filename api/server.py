@@ -61,6 +61,7 @@ class CastResponse(BaseModel):
     relating: HexagramData | None
     change_mask: str
     nuclear: HexagramData | None
+    zong_gua: HexagramData | None
 
 
 class ReadingRequest(BaseModel):
@@ -117,6 +118,7 @@ def _cast_to_response(cast: CastResult) -> CastResponse:
         relating=HexagramData.from_info(cast.relating) if cast.relating else None,
         change_mask=cast.change_mask,
         nuclear=HexagramData.from_info(cast.nuclear) if cast.nuclear else None,
+        zong_gua=HexagramData.from_info(cast.zong_gua) if cast.zong_gua else None,
     )
 
 

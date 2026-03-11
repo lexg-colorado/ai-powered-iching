@@ -13,7 +13,7 @@ async def chat(
     tools: list[dict] | None = None,
     model: str | None = None,
     temperature: float = 0.7,
-    max_tokens: int = 2048,
+    max_tokens: int = 4096,
 ) -> dict:
     """Send a chat completion request to LM Studio. Returns the full response dict."""
     client = get_client()
@@ -35,7 +35,7 @@ async def chat_stream(
     messages: list[dict],
     model: str | None = None,
     temperature: float = 0.7,
-    max_tokens: int = 2048,
+    max_tokens: int = 4096,
 ) -> AsyncIterator[str]:
     """Stream chat completion tokens from LM Studio. Yields content deltas."""
     client = get_client()

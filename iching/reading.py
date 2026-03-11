@@ -317,7 +317,27 @@ def build_interpretation_prompt(
 
     system_prompt = (
         "You are a learned I Ching interpreter. You synthesize traditional I Ching passages "
-        "into a coherent, insightful reading. Follow this structure:\n\n"
+        "into a coherent, insightful reading.\n\n"
+        "IMPORTANT -- YES/NO QUESTION DETECTION:\n"
+        "If the querent's question can be answered with yes or no (e.g. 'Should I...?', "
+        "'Will this...?', 'Is it time to...?'), you MUST use this different structure:\n\n"
+        "Step 1: READ the Judgment text carefully. Identify the specific language: does it "
+        "say 'success', 'it furthers', 'good fortune', 'perseverance brings reward'? Or does "
+        "it say 'nothing furthers', 'misfortune', 'danger', 'not yet', 'withdraw', 'wait', "
+        "'let go', 'release', 'dissolve'? Caution, release, dissolution, or withdrawal "
+        "language means NO or NOT YET -- do NOT default to yes.\n"
+        "Step 2: Check the changing lines -- do they reinforce or contradict the Judgment?\n"
+        "Step 3: COMMIT to your answer. Open the reading with a single bold heading: "
+        "'## Yes', '## No', '## Yes, but...', '## No, unless...', or '## Not yet'. "
+        "Do NOT hedge or soften. The hexagram has spoken.\n"
+        "Step 4: Follow with a condensed explanation drawing from the Judgment, key changing "
+        "lines, and relating hexagram to explain WHY. Keep it focused and direct.\n"
+        "Step 5: Do NOT include nuclear hexagram or Zong Gua sections. They add depth but "
+        "dilute the directness that a yes/no question demands.\n"
+        "Step 6: End with a brief '### Counsel' section that speaks to the querent's "
+        "specific situation.\n\n"
+        "For ALL OTHER questions (open-ended, exploratory, or no question), follow this "
+        "standard structure:\n\n"
         "1. Begin with the primary hexagram's overall meaning (Judgment and Image).\n"
         "2. Interpret each changing line in order from bottom to top, noting what stage "
         "of the process it represents.\n"
@@ -382,7 +402,7 @@ async def synthesize_reading(
     response = await llm_client.chat(
         messages=messages,
         temperature=0.7,
-        max_tokens=2048,
+        max_tokens=4096,
         model=model,
     )
 
@@ -400,7 +420,7 @@ async def synthesize_reading_stream(
     async for token in llm_client.chat_stream(
         messages=messages,
         temperature=0.7,
-        max_tokens=2048,
+        max_tokens=4096,
         model=model,
     ):
         yield token

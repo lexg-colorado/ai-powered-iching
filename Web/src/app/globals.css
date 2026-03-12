@@ -116,6 +116,28 @@ body {
   animation: fade-in-kf 0.3s ease-out;
 }
 
+/* Skeleton loading animation */
+@keyframes skeleton-pulse-kf {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.skeleton {
+  animation: skeleton-pulse-kf 1.5s ease-in-out infinite;
+  background: var(--border);
+  border-radius: 4px;
+}
+
+/* Tooltip */
+@keyframes tooltip-in-kf {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tooltip-enter {
+  animation: tooltip-in-kf 0.15s ease-out;
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .coin-spin {
@@ -129,5 +151,14 @@ body {
   .animate-fade-in {
     animation: none;
     opacity: 1;
+  }
+
+  .skeleton {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .tooltip-enter {
+    animation: none;
   }
 }

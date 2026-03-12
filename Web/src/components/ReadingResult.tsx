@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import type { ClientCastResult } from "@/lib/hexagram";
 import { LINE_INFO } from "@/lib/hexagram";
+import { generateReadingMarkdown } from "@/lib/generateReadingMarkdown";
 import HexagramDisplay from "./HexagramDisplay";
 import type { LineValue } from "@/lib/types";
 import ReactMarkdown from "react-markdown";
@@ -34,6 +35,24 @@ export default function ReadingResult({
       return val as LineValue;
     }
   );
+
+  const handleDownload = useCallback(() => {
+    const markdown = generateReadingMarkdown({
+      castResult,
+      interpretation,
+      question,
+    });
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const slug = primary.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "");
+    a.download = `iching-reading-${primary.king_wen}-${slug}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [castResult, interpretation, question, primary]);
 
   // Only apply collapsible transform after streaming completes to avoid flicker
   const processedInterpretation = useMemo(() => {
@@ -187,6 +206,33 @@ export default function ReadingResult({
       >
         New Consultation
       </button>
+
+      {/* Floating download button */}
+      {!isStreaming && interpretation && (
+        <button
+          onClick={handleDownload}
+          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-surface border border-border shadow-lg text-muted hover:text-yang hover:border-yang transition-colors"
+          aria-label="Download reading as Markdown"
+          title="Download reading as .md"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

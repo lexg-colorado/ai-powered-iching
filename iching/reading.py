@@ -12,12 +12,51 @@ Reading structure (from Interpreting Casts.md):
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 
 from iching import chromadb_client
 from iching.hexagram_lookup import CastResult, nuclear_hexagram
 from iching import hexagram_text
 from iching import llm_client
+
+
+# ---------------------------------------------------------------------------
+# Question-type classifier (runs in Python, NOT in the LLM)
+# ---------------------------------------------------------------------------
+
+# Wh-words that make a question open-ended regardless of other content
+_WH_PATTERN = re.compile(
+    r"^\s*(when|where|how|what|which|who|why)\b",
+    re.IGNORECASE,
+)
+
+# Patterns that indicate a true yes/no question (only checked when no Wh-word)
+_YES_NO_PATTERNS = re.compile(
+    r"^\s*(should\s+I|will\s+(this|it|that|I|we|my)|is\s+(it|this|that)|"
+    r"can\s+I|am\s+I|are\s+(we|they|you)|do\s+I|does\s+(this|it|that)|"
+    r"could\s+I|would\s+(it|this|that))\b",
+    re.IGNORECASE,
+)
+
+
+def classify_question(question: str | None) -> str:
+    """Classify a question as 'yes_no', 'open', or 'none'.
+
+    Rules:
+      1. No question → 'none'
+      2. Starts with a Wh-word (when, where, how, etc.) → 'open'
+      3. Matches a yes/no starter pattern → 'yes_no'
+      4. Everything else → 'open'
+    """
+    if not question or not question.strip():
+        return "none"
+    q = question.strip()
+    if _WH_PATTERN.match(q):
+        return "open"
+    if _YES_NO_PATTERNS.match(q):
+        return "yes_no"
+    return "open"
 
 
 # Line position symbolic meanings
@@ -315,29 +354,13 @@ def build_interpretation_prompt(
 
     retrieved_text = "\n".join(context_parts)
 
-    system_prompt = (
+    # Classify question type in Python -- the LLM only sees the relevant prompt
+    q_type = classify_question(question)
+
+    _OPEN_PROMPT = (
         "You are a learned I Ching interpreter. You synthesize traditional I Ching passages "
         "into a coherent, insightful reading.\n\n"
-        "IMPORTANT -- YES/NO QUESTION DETECTION:\n"
-        "If the querent's question can be answered with yes or no (e.g. 'Should I...?', "
-        "'Will this...?', 'Is it time to...?'), you MUST use this different structure:\n\n"
-        "Step 1: READ the Judgment text carefully. Identify the specific language: does it "
-        "say 'success', 'it furthers', 'good fortune', 'perseverance brings reward'? Or does "
-        "it say 'nothing furthers', 'misfortune', 'danger', 'not yet', 'withdraw', 'wait', "
-        "'let go', 'release', 'dissolve'? Caution, release, dissolution, or withdrawal "
-        "language means NO or NOT YET -- do NOT default to yes.\n"
-        "Step 2: Check the changing lines -- do they reinforce or contradict the Judgment?\n"
-        "Step 3: COMMIT to your answer. Open the reading with a single bold heading: "
-        "'## Yes', '## No', '## Yes, but...', '## No, unless...', or '## Not yet'. "
-        "Do NOT hedge or soften. The hexagram has spoken.\n"
-        "Step 4: Follow with a condensed explanation drawing from the Judgment, key changing "
-        "lines, and relating hexagram to explain WHY. Keep it focused and direct.\n"
-        "Step 5: Do NOT include nuclear hexagram or Zong Gua sections. They add depth but "
-        "dilute the directness that a yes/no question demands.\n"
-        "Step 6: End with a brief '### Counsel' section that speaks to the querent's "
-        "specific situation.\n\n"
-        "For ALL OTHER questions (open-ended, exploratory, or no question), follow this "
-        "standard structure:\n\n"
+        "Follow this structure:\n\n"
         "1. Begin with the primary hexagram's overall meaning (Judgment and Image).\n"
         "2. Interpret each changing line in order from bottom to top, noting what stage "
         "of the process it represents.\n"
@@ -362,6 +385,30 @@ def build_interpretation_prompt(
         "acknowledge it gracefully. Speak with clarity and wisdom, not mysticism. "
         "Keep the reading grounded and practical."
     )
+
+    _YES_NO_PROMPT = (
+        "You are a learned I Ching interpreter. The querent has asked a yes/no question. "
+        "Your task is to give them a direct answer derived from the hexagram texts, "
+        "followed by a focused explanation.\n\n"
+        "Step 1: READ the Judgment text carefully. Identify the specific language: does it "
+        "say 'success', 'it furthers', 'good fortune', 'perseverance brings reward'? Or does "
+        "it say 'nothing furthers', 'misfortune', 'danger', 'not yet', 'withdraw', 'wait', "
+        "'let go', 'release', 'dissolve'? Caution, release, dissolution, or withdrawal "
+        "language means NO or NOT YET -- do NOT default to yes.\n"
+        "Step 2: Check the changing lines -- do they reinforce or contradict the Judgment?\n"
+        "Step 3: COMMIT to your answer. Open the reading with a single bold heading: "
+        "'## Yes', '## No', '## Yes, but...', '## No, unless...', or '## Not yet'. "
+        "Do NOT hedge or soften. The hexagram has spoken.\n"
+        "Step 4: Follow with a condensed explanation drawing from the Judgment, key changing "
+        "lines, and relating hexagram to explain WHY. Keep it focused and direct.\n"
+        "Step 5: Do NOT include nuclear hexagram or Zong Gua sections. They add depth but "
+        "dilute the directness that a yes/no question demands.\n"
+        "Step 6: End with a brief '### Counsel' section that speaks to the querent's "
+        "specific situation.\n\n"
+        "Use the retrieved passages as your source material. Speak with clarity and wisdom."
+    )
+
+    system_prompt = _YES_NO_PROMPT if q_type == "yes_no" else _OPEN_PROMPT
 
     user_content = f"Cast result:\n"
     user_content += f"Primary: Hexagram {primary.king_wen} -- {primary.name} / {primary.title}\n"

@@ -18,7 +18,7 @@ A complete I Ching divination system with CLI, interactive REPL, REST API, and N
 - **Python 3.11+**
 - **Node.js 18+** (for the web UI)
 - **LM Studio** running locally at `http://localhost:1234/v1` with:
-  - `qwen2.5-14b-instruct-mlx` (chat/synthesis)
+  - `qwen2.5-14b-instruct` (chat/synthesis)
   - `text-embedding-nomic-embed-text-v1.5` (embeddings)
 
 ## Installation
@@ -56,8 +56,8 @@ All configuration is via environment variables or a `.env` file (checked in cwd,
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LM_STUDIO_URL` | `http://localhost:1234/v1` | LM Studio endpoint |
-| `LM_STUDIO_MODEL` | `qwen2.5-14b-instruct-mlx` | Chat model |
-| `LM_STUDIO_SYNTHESIS_MODEL` | `qwen2.5-14b-instruct-mlx` | Reading synthesis model |
+| `LM_STUDIO_MODEL` | `qwen2.5-14b-instruct` | Chat model |
+| `LM_STUDIO_SYNTHESIS_MODEL` | `qwen2.5-14b-instruct` | Reading synthesis model |
 | `LM_STUDIO_EMBEDDING_MODEL` | `text-embedding-nomic-embed-text-v1.5` | Embedding model |
 | `CHROMA_PATH` | `~/.iching/chroma_data` | ChromaDB storage path |
 | `DEFAULT_COLLECTION` | `iching_toc_test` | Default ChromaDB collection |

@@ -65,6 +65,7 @@ consultation_log.*
 # OS files
 # ========================
 .DS_Store
+._*
 Thumbs.db
 *.pem
 

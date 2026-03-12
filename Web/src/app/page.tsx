@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { loadHexagrams } from "@/lib/hexagram";
 import { getReadingStream, getTextPassages } from "@/lib/api";
 import { useHexagramBuilder } from "@/hooks/useHexagramBuilder";
@@ -121,12 +122,22 @@ export default function Home() {
       <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12">
         {/* Header */}
         <header className="mb-8">
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-            I Ching Divination
-          </h1>
-          <p className="font-heading text-base italic text-muted mt-1">
-            Cast hexagrams and consult the oracle
-          </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="font-heading text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+                I Ching Divination
+              </h1>
+              <p className="font-heading text-base italic text-muted mt-1">
+                Cast hexagrams and consult the oracle
+              </p>
+            </div>
+            <Link
+              href="/wheel"
+              className="text-sm text-muted hover:text-foreground transition-colors mt-2"
+            >
+              Explore the Wheel →
+            </Link>
+          </div>
         </header>
 
         {/* Show reading if we have one */}

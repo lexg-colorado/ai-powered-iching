@@ -269,3 +269,96 @@ export function getTrigramMappings(): TrigramMapping[] {
   _trigramMappings = mappings;
   return mappings;
 }
+
+// ---------------------------------------------------------------------------
+// Wu Xing (Five Elements) relationships
+// ---------------------------------------------------------------------------
+
+/** Traditional element-to-trigram mapping */
+export const WU_XING_TRIGRAM_MAP: Record<string, string[]> = {
+  Fire:  ["101"],              // Li
+  Earth: ["000", "100"],       // K'un, Ken
+  Metal: ["111", "011"],       // Ch'ien, Tui
+  Water: ["010"],              // K'an
+  Wood:  ["001", "110"],       // Chen, Sun
+};
+
+/** Generating (Sheng) cycle: each element generates the next */
+const SHENG_CYCLE = ["Wood", "Fire", "Earth", "Metal", "Water"];
+
+/** Overcoming (Ke) cycle: each element overcomes the one two steps ahead */
+// Wood->Earth->Water->Fire->Metal->Wood
+
+export interface ElementRelationships {
+  name: string;
+  generates: string;
+  generatedBy: string;
+  overcomes: string;
+  overcomeBy: string;
+  trigramBits: string[];
+  trigramNames: string[];
+}
+
+const TRIGRAM_NAME_MAP: Record<string, string> = {
+  "111": "Ch'ien", "000": "K'un", "001": "Chen", "010": "K'an",
+  "011": "Tui", "100": "Ken", "101": "Li", "110": "Sun",
+};
+
+/**
+ * Get Wu Xing cycle relationships for a given element.
+ */
+export function getElementRelationships(name: string): ElementRelationships {
+  const idx = SHENG_CYCLE.indexOf(name);
+  const bits = WU_XING_TRIGRAM_MAP[name] ?? [];
+  return {
+    name,
+    generates: SHENG_CYCLE[(idx + 1) % 5],
+    generatedBy: SHENG_CYCLE[(idx + 4) % 5],
+    overcomes: SHENG_CYCLE[(idx + 2) % 5],
+    overcomeBy: SHENG_CYCLE[(idx + 3) % 5],
+    trigramBits: bits,
+    trigramNames: bits.map((b) => TRIGRAM_NAME_MAP[b] ?? b),
+  };
+}
+
+/**
+ * Primary element for each hexagram (King Wen number → element name).
+ *
+ * Derived from the traditional trigram-to-element mapping with balance-aware
+ * tiebreaking: when a hexagram's two trigrams belong to different elements,
+ * it is assigned to the less-populated element. This produces a near-equal
+ * 13-13-13-13-12 distribution while ensuring every assignment is backed
+ * by a genuine trigram association.
+ */
+const HEXAGRAM_PRIMARY_ELEMENT: Record<number, string> = {
+  1: "Metal", 2: "Earth", 3: "Water", 4: "Water", 5: "Water",
+  6: "Water", 7: "Water", 8: "Water", 9: "Wood", 10: "Metal",
+  11: "Earth", 12: "Earth", 13: "Fire", 14: "Fire", 15: "Earth",
+  16: "Earth", 17: "Wood", 18: "Earth", 19: "Earth", 20: "Earth",
+  21: "Fire", 22: "Fire", 23: "Earth", 24: "Earth", 25: "Wood",
+  26: "Earth", 27: "Earth", 28: "Wood", 29: "Water", 30: "Fire",
+  31: "Metal", 32: "Wood", 33: "Metal", 34: "Wood", 35: "Fire",
+  36: "Fire", 37: "Fire", 38: "Fire", 39: "Water", 40: "Water",
+  41: "Metal", 42: "Wood", 43: "Metal", 44: "Metal", 45: "Metal",
+  46: "Wood", 47: "Water", 48: "Water", 49: "Fire", 50: "Fire",
+  51: "Wood", 52: "Earth", 53: "Wood", 54: "Metal", 55: "Fire",
+  56: "Fire", 57: "Wood", 58: "Metal", 59: "Wood", 60: "Metal",
+  61: "Metal", 62: "Wood", 63: "Water", 64: "Water",
+};
+
+/**
+ * Get all hexagrams whose primary element matches the given element name.
+ * Each hexagram belongs to exactly one element (single-assignment).
+ */
+export function getHexagramsByElement(elementName: string): HexagramData[] {
+  return allHexagrams().filter(
+    (h) => HEXAGRAM_PRIMARY_ELEMENT[h.king_wen] === elementName,
+  );
+}
+
+/**
+ * Get the primary element for a given hexagram.
+ */
+export function getElementForHexagram(kingWen: number): string | null {
+  return HEXAGRAM_PRIMARY_ELEMENT[kingWen] ?? null;
+}

@@ -39,6 +39,12 @@ interface HexagramWheelProps {
   highlightedTrigram?: string | null;
   /** Optional viewBox override for zoom-to-selection */
   viewBoxOverride?: string;
+  /** Wu Xing element interactivity */
+  selectedElement?: string | null;
+  hoveredElement?: string | null;
+  elementsInteractive?: boolean;
+  onElementClick?: (name: string) => void;
+  onElementHover?: (name: string | null) => void;
   /** Callbacks */
   onHexagramClick?: (kingWen: number) => void;
   onHexagramHover?: (kingWen: number | null, clientX?: number, clientY?: number) => void;
@@ -58,6 +64,11 @@ export function HexagramWheel({
   particleRef,
   highlightedTrigram,
   viewBoxOverride,
+  selectedElement,
+  hoveredElement,
+  elementsInteractive = false,
+  onElementClick,
+  onElementHover,
   onHexagramClick,
   onHexagramHover,
   onTrigramHover,
@@ -156,6 +167,11 @@ export function HexagramWheel({
             center={layout.center}
             radius={layout.centerRadius}
             scale={layout.glyphScale}
+            selectedElement={selectedElement}
+            hoveredElement={hoveredElement}
+            interactive={elementsInteractive}
+            onElementClick={onElementClick}
+            onElementHover={onElementHover}
           />
         </g>
 

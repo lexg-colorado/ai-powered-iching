@@ -192,10 +192,11 @@ function HexagramGlyphInner({
       {/* King Wen number — positioned radially outward from the glyph */}
       <text
         transform={`rotate(${textRotDeg})`}
-        x={isBottomHalf ? -GLYPH_HEIGHT * scale - 4 : GLYPH_HEIGHT * scale + 4}
+        x={isBottomHalf ? -GLYPH_HEIGHT * scale - 5 : GLYPH_HEIGHT * scale + 5}
         y={1.5}
         textAnchor={textAnchor}
-        fontSize={7 * scale}
+        fontSize={9 * scale}
+        fontWeight={500}
         fontFamily="var(--font-inter), Inter, system-ui, sans-serif"
         fill={styles.textColor}
         style={{ transition: "fill 300ms ease" }}
@@ -207,13 +208,13 @@ function HexagramGlyphInner({
       {!compact && (
         <text
           transform={`rotate(${textRotDeg})`}
-          x={isBottomHalf ? -GLYPH_HEIGHT * scale - 13 : GLYPH_HEIGHT * scale + 13}
+          x={isBottomHalf ? -GLYPH_HEIGHT * scale - 16 : GLYPH_HEIGHT * scale + 16}
           y={1.5}
           textAnchor={textAnchor}
-          fontSize={5.5 * scale}
+          fontSize={7 * scale}
           fontFamily="var(--font-crimson-pro), Crimson Pro, Georgia, serif"
           fill={styles.textColor}
-          opacity={0.8}
+          opacity={0.85}
           style={{ transition: "fill 300ms ease, opacity 300ms ease" }}
         >
           {name}

@@ -110,7 +110,7 @@ export function useWheelLayout(
 
     const outerRadius = size * 0.40;
     const innerRadius = size * 0.22;
-    const centerRadius = size * 0.08;
+    const centerRadius = size * 0.11;
     const glyphScale = Math.max(0.3, size / 1200);
 
     // Outer ring: 64 hexagrams in King Wen order

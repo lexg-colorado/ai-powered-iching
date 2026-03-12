@@ -20,10 +20,12 @@ import { loadHexagrams, allHexagrams, lookupByBinary } from "../../lib/hexagram"
 import { HexagramWheel } from "../../components/wheel/HexagramWheel";
 import { WheelControls, type WheelMode } from "../../components/wheel/WheelControls";
 import { TransformationOverlay } from "../../components/wheel/TransformationOverlay";
+import { HexagramSearchInput } from "../../components/wheel/HexagramSearchInput";
 import { HexagramTooltip } from "../../components/wheel/HexagramTooltip";
 import { PathwaySidebar, type PathwayStep } from "../../components/wheel/PathwaySidebar";
 import { NeighborsSidebar } from "../../components/wheel/NeighborsSidebar";
 import { TrigramFilterSidebar } from "../../components/wheel/TrigramFilterSidebar";
+import { ElementsSidebar } from "../../components/wheel/ElementsSidebar";
 import { useDragRotation } from "../../hooks/useDragRotation";
 import { useHexagramTextCache } from "../../hooks/useHexagramTextCache";
 import { useViewBoxZoom } from "../../hooks/useViewBoxZoom";
@@ -34,6 +36,7 @@ import {
   flipLine,
   findNeighbors,
   filterByTrigramPair,
+  getHexagramsByElement,
   type HexagramRelationships,
   type TransformationInfo,
   type NeighborEntry,
@@ -71,6 +74,10 @@ export default function WheelPage() {
     upper: null,
     lower: null,
   });
+
+  // ── Elements mode state ──
+  const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
 
   // ── Trigram hover state (works across modes) ──
   const [highlightedTrigram, setHighlightedTrigram] = useState<string | null>(null);
@@ -155,6 +162,13 @@ export default function WheelPage() {
     return filterByTrigramPair(trigramFilter.upper, trigramFilter.lower);
   }, [trigramFilter, mode]);
 
+  // ── Compute element-associated hexagrams (elements mode) ──
+  const activeElement = selectedElement || hoveredElement;
+  const elementHexagrams = useMemo(() => {
+    if (mode !== "elements" || !activeElement) return [];
+    return getHexagramsByElement(activeElement);
+  }, [mode, activeElement]);
+
   // ── Build glyph state map ──
   const glyphStates = useMemo(() => {
     const states = new Map<number, GlyphState>();
@@ -211,6 +225,13 @@ export default function WheelPage() {
           states.set(h.king_wen, matchSet.has(h.king_wen) ? "filtered" : "dimmed");
         }
       }
+    } else if (mode === "elements") {
+      if (activeElement && elementHexagrams.length > 0) {
+        const matchSet = new Set(elementHexagrams.map((h) => h.king_wen));
+        for (const h of hexagrams) {
+          states.set(h.king_wen, matchSet.has(h.king_wen) ? "highlighted" : "dimmed");
+        }
+      }
     }
 
     return states;
@@ -220,6 +241,7 @@ export default function WheelPage() {
     highlightedTrigram, trigramHexagrams,
     pathwaySteps, neighborsSource, neighborsData, maxNeighborDistance,
     trigramFilter, filteredHexagrams,
+    activeElement, elementHexagrams,
   ]);
 
   // ── Handle hexagram click ──
@@ -292,6 +314,16 @@ export default function WheelPage() {
     [mode],
   );
 
+  // ── Elements mode: click an element ──
+  const handleElementClick = useCallback((name: string) => {
+    setSelectedElement((prev) => (prev === name ? null : name));
+  }, []);
+
+  // ── Elements mode: hover an element ──
+  const handleElementHover = useCallback((name: string | null) => {
+    setHoveredElement(name);
+  }, []);
+
   // ── Pathway mode: flip a line ──
   const handleFlipLine = useCallback(
     (lineNumber: number) => {
@@ -327,10 +359,8 @@ export default function WheelPage() {
     setMaxNeighborDistance(1);
   }, []);
 
-  // ── Handle mode switch ──
-  const handleModeChange = useCallback((newMode: WheelMode) => {
-    setMode(newMode);
-    // Clear all mode-specific state
+  // ── Clear all mode-specific state (shared between mode switch and reset) ──
+  const clearAllState = useCallback(() => {
     setSelectedHex(null);
     setRelationships(null);
     setTransformSource(null);
@@ -342,8 +372,22 @@ export default function WheelPage() {
     setNeighborsData(new Map());
     setMaxNeighborDistance(1);
     setTrigramFilter({ upper: null, lower: null });
+    setSelectedElement(null);
+    setHoveredElement(null);
     resetZoom();
   }, [resetZoom]);
+
+  // ── Handle mode switch ──
+  const handleModeChange = useCallback((newMode: WheelMode) => {
+    setMode(newMode);
+    clearAllState();
+  }, [clearAllState]);
+
+  // ── Handle reset (clears state but preserves current mode) ──
+  const handleReset = useCallback(() => {
+    clearAllState();
+    drag.resetRotation();
+  }, [clearAllState, drag]);
 
   // ── Navigate to related hexagram ──
   const navigateToHex = useCallback(
@@ -392,10 +436,14 @@ export default function WheelPage() {
         return "Adjust distance or click a neighbor to re-center";
       case "trigram_filter":
         return "Click trigrams on the wheel or grid to filter hexagrams";
+      case "elements":
+        return selectedElement
+          ? `Showing hexagrams associated with ${selectedElement}`
+          : "Click an element at the center of the wheel to explore Wu Xing relationships";
       default:
         return "";
     }
-  }, [mode, transformSource, transformTarget, pathwaySteps.length, neighborsSource]);
+  }, [mode, transformSource, transformTarget, pathwaySteps.length, neighborsSource, selectedElement]);
 
   if (loading) {
     return (
@@ -420,7 +468,7 @@ export default function WheelPage() {
           <WheelControls
             mode={mode}
             onModeChange={handleModeChange}
-            onResetRotation={drag.resetRotation}
+            onReset={handleReset}
           />
           <Link href="/" className="text-sm text-muted hover:text-foreground transition-colors">
             ← Back to Divination
@@ -439,6 +487,11 @@ export default function WheelPage() {
             rotation={drag.rotation}
             particleRef={particleRef}
             highlightedTrigram={highlightedTrigram}
+            selectedElement={mode === "elements" ? selectedElement : null}
+            hoveredElement={mode === "elements" ? hoveredElement : null}
+            elementsInteractive={mode === "elements"}
+            onElementClick={handleElementClick}
+            onElementHover={handleElementHover}
             onHexagramClick={handleHexagramClick}
             onHexagramHover={handleHexagramHover}
             onTrigramHover={handleTrigramHover}
@@ -454,8 +507,17 @@ export default function WheelPage() {
             ════════════════════════════════════════════════════════════════════ */}
 
         {/* ── Explore mode sidebar ── */}
-        {mode === "explore" && selectedHex != null && relationships && (
+        {mode === "explore" && (
           <aside className="w-80 border-l border-border bg-surface p-6 overflow-y-auto animate-fade-in hidden lg:block">
+            <HexagramSearchInput
+              value={selectedHex}
+              onChange={(kw) => setSelectedHex(kw)}
+              label="Hexagram"
+              placeholder="Search by number or name..."
+            />
+
+            {selectedHex != null && relationships && (
+              <>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-heading text-foreground">
                 #{relationships.source.king_wen} {relationships.source.name}
@@ -577,20 +639,58 @@ export default function WheelPage() {
                 </div>
               )}
             </div>
+              </>
+            )}
           </aside>
         )}
 
         {/* ── Transform mode sidebar ── */}
-        {mode === "transform" && transformInfo && (
+        {mode === "transform" && (
           <aside className="w-80 border-l border-border bg-surface p-6 overflow-y-auto animate-fade-in hidden lg:block">
-            <TransformationOverlay
-              info={transformInfo}
-              onClose={() => {
-                setTransformSource(null);
-                setTransformTarget(null);
-                setTransformInfo(null);
-              }}
-            />
+            <h2 className="text-lg font-heading text-foreground mb-4">Transform</h2>
+            <div className="flex items-end gap-2 mb-4">
+              <div className="flex-1">
+                <HexagramSearchInput
+                  value={transformSource}
+                  onChange={(kw) => setTransformSource(kw)}
+                  label="Source"
+                  placeholder="Source hexagram..."
+                />
+              </div>
+              <button
+                onClick={() => {
+                  const s = transformSource;
+                  const t = transformTarget;
+                  setTransformSource(t);
+                  setTransformTarget(s);
+                }}
+                disabled={transformSource == null || transformTarget == null}
+                className="px-2 py-1.5 mb-3 text-xs border border-border rounded text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Swap source and target"
+              >
+                ⇄
+              </button>
+              <div className="flex-1">
+                <HexagramSearchInput
+                  value={transformTarget}
+                  onChange={(kw) => {
+                    if (kw !== transformSource) setTransformTarget(kw);
+                  }}
+                  label="Target"
+                  placeholder="Target hexagram..."
+                />
+              </div>
+            </div>
+            {transformInfo && (
+              <TransformationOverlay
+                info={transformInfo}
+                onClose={() => {
+                  setTransformSource(null);
+                  setTransformTarget(null);
+                  setTransformInfo(null);
+                }}
+              />
+            )}
           </aside>
         )}
 
@@ -603,27 +703,47 @@ export default function WheelPage() {
               onFlipLine={handleFlipLine}
               onUndo={handlePathwayUndo}
               onReset={handlePathwayReset}
+              onStartFrom={(kw) => {
+                const hex = hexagrams.find((h) => h.king_wen === kw);
+                if (hex) setPathwaySteps([{ hex, lineFlipped: null }]);
+              }}
               onNavigate={(kw) => {
-                // Navigate to the step in the history — just visual, don't change path
+                // Truncate path history to the clicked step
+                const idx = pathwaySteps.findIndex((s) => s.hex.king_wen === kw);
+                if (idx >= 0) {
+                  setPathwaySteps((prev) => prev.slice(0, idx + 1));
+                }
               }}
             />
           </aside>
         )}
 
         {/* ── Neighbors mode sidebar ── */}
-        {mode === "neighbors" && neighborsSourceHex && (
+        {mode === "neighbors" && (
           <aside className="w-80 border-l border-border bg-surface p-6 overflow-y-auto animate-fade-in hidden lg:block">
-            <NeighborsSidebar
-              source={neighborsSourceHex}
-              neighbors={neighborsData}
-              maxDistance={maxNeighborDistance}
-              onDistanceChange={handleDistanceChange}
-              onSelectNeighbor={handleSelectNeighbor}
-              onClose={() => {
-                setNeighborsSource(null);
-                setNeighborsData(new Map());
+            <h2 className="text-lg font-heading text-foreground mb-4">Neighbors</h2>
+            <HexagramSearchInput
+              value={neighborsSource}
+              onChange={(kw) => {
+                setNeighborsSource(kw);
+                setMaxNeighborDistance(1);
               }}
+              label="Center Hexagram"
+              placeholder="Search by number or name..."
             />
+            {neighborsSourceHex && (
+              <NeighborsSidebar
+                source={neighborsSourceHex}
+                neighbors={neighborsData}
+                maxDistance={maxNeighborDistance}
+                onDistanceChange={handleDistanceChange}
+                onSelectNeighbor={handleSelectNeighbor}
+                onClose={() => {
+                  setNeighborsSource(null);
+                  setNeighborsData(new Map());
+                }}
+              />
+            )}
           </aside>
         )}
 
@@ -642,6 +762,21 @@ export default function WheelPage() {
                 setMode("explore");
                 setSelectedHex(kw);
               }}
+            />
+          </aside>
+        )}
+
+        {/* ── Elements mode sidebar ── */}
+        {mode === "elements" && (
+          <aside className="w-80 border-l border-border bg-surface p-6 overflow-y-auto animate-fade-in hidden lg:block">
+            <ElementsSidebar
+              selectedElement={selectedElement}
+              onSelectElement={(name) => setSelectedElement(name)}
+              onSelectHexagram={(kw) => {
+                setMode("explore");
+                setSelectedHex(kw);
+              }}
+              onClear={() => setSelectedElement(null)}
             />
           </aside>
         )}

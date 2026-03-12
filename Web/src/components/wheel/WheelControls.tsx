@@ -6,18 +6,18 @@
 
 import { memo } from "react";
 
-export type WheelMode = "explore" | "transform" | "pathway" | "neighbors" | "trigram_filter";
+export type WheelMode = "explore" | "transform" | "pathway" | "neighbors" | "trigram_filter" | "elements";
 
 interface WheelControlsProps {
   mode: WheelMode;
   onModeChange: (mode: WheelMode) => void;
-  onResetRotation: () => void;
+  onReset: () => void;
 }
 
 function WheelControlsInner({
   mode,
   onModeChange,
-  onResetRotation,
+  onReset,
 }: WheelControlsProps) {
   return (
     <div className="flex items-center gap-2">
@@ -83,13 +83,25 @@ function WheelControlsInner({
         >
           Trigrams
         </button>
+        <button
+          onClick={() => onModeChange("elements")}
+          className={`px-2 py-1.5 transition-colors border-l border-border ${
+            mode === "elements"
+              ? "bg-accent-changing/20 text-foreground font-medium"
+              : "bg-surface text-muted hover:text-foreground"
+          }`}
+          aria-pressed={mode === "elements"}
+          title="Elements: explore Wu Xing (Five Elements) relationships and associated hexagrams"
+        >
+          Elements
+        </button>
       </div>
 
-      {/* Reset rotation */}
+      {/* Reset all state */}
       <button
-        onClick={onResetRotation}
+        onClick={onReset}
         className="px-2 py-1.5 text-xs text-muted hover:text-foreground border border-border rounded-md bg-surface transition-colors"
-        title="Reset wheel rotation to default"
+        title="Reset all state in the current mode"
       >
         Reset
       </button>

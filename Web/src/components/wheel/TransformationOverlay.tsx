@@ -8,7 +8,9 @@
 "use client";
 
 import { memo } from "react";
+import type { HexagramData } from "../../lib/types";
 import type { TransformationInfo } from "../../lib/wheelRelationships";
+import { TRIGRAMS, nuclearHexagram, nuclearTrigrams, trigramName } from "../../lib/hexagram";
 
 interface TransformationOverlayProps {
   info: TransformationInfo;
@@ -55,6 +57,168 @@ function MiniGlyph({
     }
   }
   return <div className="flex flex-col gap-[3px] w-10">{lines}</div>;
+}
+
+/** Trigram analysis: show upper/lower trigrams for both hexagrams and whether they change */
+function TrigramAnalysis({ from, to }: { from: HexagramData; to: HexagramData }) {
+  const fromUpper = from.binary.slice(0, 3);
+  const fromLower = from.binary.slice(3, 6);
+  const toUpper = to.binary.slice(0, 3);
+  const toLower = to.binary.slice(3, 6);
+
+  const upperChanged = fromUpper !== toUpper;
+  const lowerChanged = fromLower !== toLower;
+
+  return (
+    <div className="mt-6">
+      <h3 className="text-sm font-heading text-foreground mb-3 border-b border-border pb-1">
+        Trigram Analysis
+      </h3>
+      <div className="space-y-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-muted w-14">Upper:</span>
+          <span className="text-yang">{TRIGRAMS[fromUpper]?.name ?? fromUpper}</span>
+          <span className="text-muted text-[10px]">({TRIGRAMS[fromUpper]?.attribute})</span>
+          <span className="text-muted">→</span>
+          <span className="text-yin">{TRIGRAMS[toUpper]?.name ?? toUpper}</span>
+          <span className="text-muted text-[10px]">({TRIGRAMS[toUpper]?.attribute})</span>
+          <span className={`text-[10px] ml-auto ${upperChanged ? "text-changing" : "text-muted"}`}>
+            {upperChanged ? "changes" : "stable"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-muted w-14">Lower:</span>
+          <span className="text-yang">{TRIGRAMS[fromLower]?.name ?? fromLower}</span>
+          <span className="text-muted text-[10px]">({TRIGRAMS[fromLower]?.attribute})</span>
+          <span className="text-muted">→</span>
+          <span className="text-yin">{TRIGRAMS[toLower]?.name ?? toLower}</span>
+          <span className="text-muted text-[10px]">({TRIGRAMS[toLower]?.attribute})</span>
+          <span className={`text-[10px] ml-auto ${lowerChanged ? "text-changing" : "text-muted"}`}>
+            {lowerChanged ? "changes" : "stable"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Nuclear hexagrams: hidden inner dynamic for source and target */
+function NuclearHexagrams({ from, to }: { from: HexagramData; to: HexagramData }) {
+  const fromNuclear = nuclearHexagram(from.binary);
+  const toNuclear = nuclearHexagram(to.binary);
+
+  const [fromNucLower, fromNucUpper] = nuclearTrigrams(from.binary);
+  const [toNucLower, toNucUpper] = nuclearTrigrams(to.binary);
+
+  return (
+    <div className="mt-6">
+      <h3 className="text-sm font-heading text-foreground mb-3 border-b border-border pb-1">
+        Nuclear Hexagrams (Hu Gua)
+      </h3>
+      <div className="space-y-3 text-xs">
+        {/* Source nuclear */}
+        <div>
+          <div className="text-muted mb-1">Source inner dynamic:</div>
+          {fromNuclear ? (
+            <div className="flex items-center gap-3 pl-2">
+              <MiniGlyph binary={fromNuclear.binary} color="var(--accent-yang)" />
+              <div>
+                <div className="text-yang font-heading">
+                  #{fromNuclear.king_wen} {fromNuclear.name}
+                </div>
+                <div className="text-muted text-[10px]">
+                  {trigramName(fromNucUpper)} over {trigramName(fromNucLower)}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-muted pl-2">—</span>
+          )}
+        </div>
+        {/* Target nuclear */}
+        <div>
+          <div className="text-muted mb-1">Target inner dynamic:</div>
+          {toNuclear ? (
+            <div className="flex items-center gap-3 pl-2">
+              <MiniGlyph binary={toNuclear.binary} color="var(--accent-yin)" />
+              <div>
+                <div className="text-yin font-heading">
+                  #{toNuclear.king_wen} {toNuclear.name}
+                </div>
+                <div className="text-muted text-[10px]">
+                  {trigramName(toNucUpper)} over {trigramName(toNucLower)}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-muted pl-2">—</span>
+          )}
+        </div>
+        {/* Same nuclear? */}
+        {fromNuclear && toNuclear && fromNuclear.king_wen === toNuclear.king_wen && (
+          <div className="text-muted italic text-[10px] pl-2">
+            Both share the same nuclear hexagram — the hidden dynamic persists through the transformation.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Yin/yang balance comparison between source and target */
+function YinYangBalance({ from, to }: { from: HexagramData; to: HexagramData }) {
+  const count = (binary: string) => {
+    let yang = 0;
+    for (const b of binary) if (b === "1") yang++;
+    return { yang, yin: 6 - yang };
+  };
+
+  const fromCount = count(from.binary);
+  const toCount = count(to.binary);
+  const yangShift = toCount.yang - fromCount.yang;
+
+  const label = (c: { yang: number; yin: number }) => {
+    if (c.yang === 6) return "pure yang";
+    if (c.yin === 6) return "pure yin";
+    if (c.yang === c.yin) return "balanced";
+    return c.yang > c.yin ? "yang dominant" : "yin dominant";
+  };
+
+  const bar = (yang: number) => (
+    <div className="flex h-2 w-full rounded overflow-hidden">
+      <div className="bg-yang" style={{ width: `${(yang / 6) * 100}%` }} />
+      <div className="bg-yin" style={{ width: `${((6 - yang) / 6) * 100}%` }} />
+    </div>
+  );
+
+  return (
+    <div className="mt-6">
+      <h3 className="text-sm font-heading text-foreground mb-3 border-b border-border pb-1">
+        Yin/Yang Balance
+      </h3>
+      <div className="space-y-3 text-xs">
+        <div>
+          <div className="flex justify-between text-muted mb-1">
+            <span>Source</span>
+            <span>{fromCount.yang} yang / {fromCount.yin} yin ({label(fromCount)})</span>
+          </div>
+          {bar(fromCount.yang)}
+        </div>
+        <div>
+          <div className="flex justify-between text-muted mb-1">
+            <span>Target</span>
+            <span>{toCount.yang} yang / {toCount.yin} yin ({label(toCount)})</span>
+          </div>
+          {bar(toCount.yang)}
+        </div>
+        {yangShift !== 0 && (
+          <div className="text-muted text-[10px] text-center">
+            Shift: {yangShift > 0 ? "+" : ""}{yangShift} yang / {yangShift > 0 ? "" : "+"}{-yangShift} yin
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function TransformationOverlayInner({
@@ -187,6 +351,15 @@ function TransformationOverlayInner({
           </div>
         )}
       </div>
+
+      {/* --- Option A: Trigram Analysis --- */}
+      <TrigramAnalysis from={from} to={to} />
+
+      {/* --- Option B: Nuclear Hexagrams --- */}
+      <NuclearHexagrams from={from} to={to} />
+
+      {/* --- Option H: Yin/Yang Balance --- */}
+      <YinYangBalance from={from} to={to} />
     </div>
   );
 }

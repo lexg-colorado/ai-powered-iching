@@ -50,6 +50,12 @@ yarn-error.log*
 chroma_data/
 
 # ========================
+# Runtime / process management
+# ========================
+logs/
+.iching-pids
+
+# ========================
 # Divination / consultation history
 # (readings, logs, and personal session data)
 # ========================

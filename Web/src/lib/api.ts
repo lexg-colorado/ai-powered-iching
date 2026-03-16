@@ -57,6 +57,8 @@ export async function listCollections(): Promise<CollectionInfo[]> {
 
 export interface ReadingStreamCallbacks {
   onMeta: (data: { cast: CastResponse; header: string }) => void;
+  onThinking: (text: string) => void;
+  onThinkingDone: () => void;
   onToken: (text: string) => void;
   onDone: () => void;
   onError: (message: string) => void;
@@ -66,11 +68,19 @@ export async function getReadingStream(
   req: ReadingRequest,
   callbacks: ReadingStreamCallbacks,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/reading/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/reading/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+  } catch {
+    callbacks.onError(
+      "Cannot connect to the I Ching API server. Make sure it is running on port 8000."
+    );
+    return;
+  }
 
   if (!res.ok) {
     const body = await res.text();
@@ -100,6 +110,12 @@ export async function getReadingStream(
           switch (currentEvent) {
             case "meta":
               callbacks.onMeta(data);
+              break;
+            case "thinking":
+              callbacks.onThinking(data.text);
+              break;
+            case "thinking_done":
+              callbacks.onThinkingDone();
               break;
             case "token":
               callbacks.onToken(data.text);

@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from collections.abc import AsyncIterator
 
-from iching import chromadb_client
+from iching import chromadb_client, config
 from iching.hexagram_lookup import CastResult, nuclear_hexagram
 from iching import hexagram_text
 from iching import llm_client
@@ -449,11 +449,13 @@ async def synthesize_reading(
     response = await llm_client.chat(
         messages=messages,
         temperature=0.7,
-        max_tokens=4096,
+        max_tokens=config.get_max_tokens(model),
         model=model,
     )
 
-    return response.choices[0].message.content
+    raw = response.choices[0].message.content
+    clean, _ = llm_client.strip_think_blocks(raw)
+    return clean
 
 
 async def synthesize_reading_stream(
@@ -461,16 +463,20 @@ async def synthesize_reading_stream(
     passages: dict[str, list[dict]],
     question: str | None = None,
     model: str | None = None,
-) -> AsyncIterator[str]:
-    """Stream LLM interpretation tokens. Yields content deltas."""
+) -> AsyncIterator[tuple[str, str]]:
+    """Stream LLM interpretation tokens with thinking classification.
+
+    Yields (event_type, text) tuples where event_type is
+    'thinking', 'thinking_done', or 'content'.
+    """
     messages = build_interpretation_prompt(cast, passages, question)
-    async for token in llm_client.chat_stream(
+    async for event_type, token in llm_client.chat_stream_with_thinking(
         messages=messages,
         temperature=0.7,
-        max_tokens=4096,
+        max_tokens=config.get_max_tokens(model),
         model=model,
     ):
-        yield token
+        yield event_type, token
 
 
 def format_reading_header(cast: CastResult, question: str | None = None) -> str:

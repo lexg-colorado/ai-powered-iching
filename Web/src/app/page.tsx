@@ -11,6 +11,7 @@ import HexagramBuilder from "@/components/HexagramBuilder";
 import HexagramNumberInput from "@/components/HexagramNumberInput";
 import HexagramDisplay from "@/components/HexagramDisplay";
 import ReadingResult from "@/components/ReadingResult";
+import GhostThinkingOverlay from "@/components/GhostThinkingOverlay";
 import TextPassagesResult from "@/components/TextPassagesResult";
 import type { LineValue } from "@/lib/types";
 
@@ -27,6 +28,17 @@ export default function Home() {
   const streamTextRef = useRef("");
   const rafRef = useRef<number | null>(null);
 
+  // Thinking state
+  const thinkingTextRef = useRef("");
+  const thinkingRafRef = useRef<number | null>(null);
+  const [thinkingText, setThinkingText] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
+
+  const flushThinkingText = useCallback(() => {
+    setThinkingText(thinkingTextRef.current);
+    thinkingRafRef.current = null;
+  }, []);
+
   const flushStreamText = useCallback(() => {
     const text = streamTextRef.current;
     builder.setReading((prev) =>
@@ -41,6 +53,9 @@ export default function Home() {
     builder.setIsLoading(true);
     builder.setError(null);
     streamTextRef.current = "";
+    thinkingTextRef.current = "";
+    setThinkingText("");
+    setIsThinking(false);
 
     // Show reading view immediately with empty interpretation
     builder.setReading({ interpretation: "", header: "" });
@@ -55,6 +70,20 @@ export default function Home() {
           onMeta: (data) => {
             builder.setReading({ interpretation: "", header: data.header });
           },
+          onThinking: (text) => {
+            setIsThinking(true);
+            thinkingTextRef.current += text;
+            if (thinkingRafRef.current === null) {
+              thinkingRafRef.current = requestAnimationFrame(flushThinkingText);
+            }
+          },
+          onThinkingDone: () => {
+            if (thinkingRafRef.current !== null) {
+              cancelAnimationFrame(thinkingRafRef.current);
+            }
+            flushThinkingText();
+            setIsThinking(false);
+          },
           onToken: (text) => {
             streamTextRef.current += text;
             // Batch UI updates to animation frames to avoid excessive re-renders
@@ -68,12 +97,14 @@ export default function Home() {
               cancelAnimationFrame(rafRef.current);
             }
             flushStreamText();
+            setIsThinking(false);
             builder.setIsLoading(false);
           },
           onError: (message) => {
             builder.setError(message);
             builder.setReading(null);
             builder.setIsLoading(false);
+            setIsThinking(false);
           },
         },
       );
@@ -119,6 +150,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      <GhostThinkingOverlay isVisible={isThinking} thinkingText={thinkingText} />
       <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12">
         {/* Header */}
         <header className="mb-8">

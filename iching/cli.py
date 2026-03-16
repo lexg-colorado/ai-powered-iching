@@ -85,7 +85,7 @@ async def _auto_cast(question: str | None):
 
     from iching.app import Session, initialize
     from iching.hexagram_lookup import cast_coins
-    from iching.reading import format_reading_header, retrieve_reading_passages, synthesize_reading
+    from iching.reading import format_reading_header, retrieve_reading_passages, synthesize_reading_stream
     from iching import config
 
     console = Console()
@@ -109,16 +109,33 @@ async def _auto_cast(question: str | None):
         console.print("[yellow]No passages found.[/yellow]")
         return
 
-    console.print(f"[cyan]Synthesizing reading...[/cyan]  [dim](model: {config.LM_STUDIO_SYNTHESIS_MODEL})[/dim]")
+    console.print(f"[cyan]Synthesizing reading...[/cyan]  [dim](model: {config.get_synthesis_model()})[/dim]")
     try:
-        reading_text = await synthesize_reading(
-            cast, passages, question, model=config.LM_STUDIO_SYNTHESIS_MODEL,
-        )
-        console.print(Panel(
-            Markdown(reading_text),
-            title="Reading Interpretation",
-            border_style="green",
-            padding=(1, 2),
-        ))
+        content_text = ""
+        is_thinking = False
+
+        async for event_type, token in synthesize_reading_stream(
+            cast, passages, question, model=config.get_synthesis_model(),
+        ):
+            if event_type == "thinking":
+                if not is_thinking:
+                    is_thinking = True
+                    console.print("[dim italic]Thinking...[/dim italic]", end="")
+                console.print(f"[dim]{token}[/dim]", end="")
+            elif event_type == "thinking_done":
+                is_thinking = False
+                console.print()
+            elif event_type == "content":
+                content_text += token
+
+        if content_text.strip():
+            console.print(Panel(
+                Markdown(content_text.strip()),
+                title="Reading Interpretation",
+                border_style="green",
+                padding=(1, 2),
+            ))
+        else:
+            console.print("[yellow]Model produced no content.[/yellow]")
     except Exception as e:
         console.print(f"[red]LLM synthesis failed: {e}[/red]")

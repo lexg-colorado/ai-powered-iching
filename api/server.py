@@ -126,15 +126,12 @@ def _cast_to_response(cast: CastResult) -> CastResponse:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: verify LM Studio connectivity
-    try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(base_url=config.LM_STUDIO_URL, api_key="lm-studio")
-        models = await client.models.list()
-        model_ids = [m.id for m in models.data]
-        print(f"LM Studio connected — models: {', '.join(model_ids)}")
-    except Exception as e:
-        print(f"Warning: Could not connect to LM Studio at {config.LM_STUDIO_URL}: {e}")
+    # Startup: auto-detect LM Studio models
+    result = await config.detect_and_configure()
+    if result:
+        print(f"LM Studio connected — chat: {result['chat_model']}, embedding: {result['embedding_model']}")
+    else:
+        print(f"Warning: Could not connect to LM Studio at {config.LM_STUDIO_URL}")
     yield
 
 
@@ -219,7 +216,7 @@ async def reading(req: ReadingRequest):
     # Synthesize reading
     try:
         interpretation = await synthesize_reading(
-            cast, passages, req.question, model=config.LM_STUDIO_SYNTHESIS_MODEL,
+            cast, passages, req.question, model=config.get_synthesis_model(),
         )
     except Exception as e:
         raise HTTPException(500, f"LLM synthesis failed: {e}")
@@ -272,19 +269,43 @@ async def reading_stream(req: ReadingRequest):
             "data": json.dumps({"cast": cast_data, "header": header}),
         }
 
-        # Stream LLM tokens
+        # Stream LLM tokens with thinking/content classification
         try:
-            async for token in synthesize_reading_stream(
-                cast, passages, req.question, model=config.LM_STUDIO_SYNTHESIS_MODEL,
+            async for event_type, token in synthesize_reading_stream(
+                cast, passages, req.question, model=config.get_synthesis_model(),
             ):
-                yield {"event": "token", "data": json.dumps({"text": token})}
+                if event_type == "thinking":
+                    yield {"event": "thinking", "data": json.dumps({"text": token})}
+                elif event_type == "thinking_done":
+                    yield {"event": "thinking_done", "data": "{}"}
+                elif event_type == "content":
+                    yield {"event": "token", "data": json.dumps({"text": token})}
         except Exception as e:
             yield {"event": "error", "data": json.dumps({"message": f"LLM synthesis failed: {e}"})}
             return
 
         yield {"event": "done", "data": "{}"}
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(event_generator(), ping=15)
+
+
+@app.get("/api/models")
+async def models():
+    """Return the currently active models (auto-detected or fallback defaults)."""
+    return {
+        "chat": config.get_chat_model(),
+        "embedding": config.get_embedding_model(),
+        "synthesis": config.get_synthesis_model(),
+    }
+
+
+@app.post("/api/models/refresh")
+async def models_refresh():
+    """Re-detect models from LM Studio (use after swapping models without restarting)."""
+    result = await config.detect_and_configure()
+    if result is None:
+        raise HTTPException(503, "Could not connect to LM Studio")
+    return result
 
 
 @app.get("/api/collections")

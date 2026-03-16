@@ -21,6 +21,7 @@ from iching.hexagram_lookup import (
 )
 from iching.reading import (
     format_reading_header, retrieve_reading_passages, synthesize_reading,
+    synthesize_reading_stream,
 )
 
 console = Console()
@@ -42,16 +43,16 @@ class Session:
 
 
 async def initialize():
-    """Verify LM Studio connectivity and show collections."""
-    try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(base_url=config.LM_STUDIO_URL, api_key="lm-studio")
-        models = await client.models.list()
-        model_ids = [m.id for m in models.data]
-        console.print(f"[green]LM Studio connected[/green] — models: {', '.join(model_ids)}")
-    except Exception as e:
+    """Verify LM Studio connectivity, auto-detect models, and show collections."""
+    result = await config.detect_and_configure()
+    if result:
+        console.print(
+            f"[green]LM Studio connected[/green] — "
+            f"chat: [cyan]{result['chat_model']}[/cyan], "
+            f"embedding: [cyan]{result['embedding_model']}[/cyan]"
+        )
+    else:
         console.print(f"[yellow]Warning: Could not connect to LM Studio at {config.LM_STUDIO_URL}[/yellow]")
-        console.print(f"  {e}")
 
     collections = chromadb_client.list_collections()
     if collections:
@@ -325,17 +326,37 @@ async def cmd_cast(session: Session, args: str):
         console.print("[yellow]No relevant passages found.[/yellow]")
         return
 
-    console.print(f"\n[cyan]Synthesizing reading...[/cyan]  [dim](model: {config.LM_STUDIO_SYNTHESIS_MODEL})[/dim]")
+    console.print(f"\n[cyan]Synthesizing reading...[/cyan]  [dim](model: {config.get_synthesis_model()})[/dim]")
     try:
-        reading_text = await synthesize_reading(
-            cast, passages, question, model=config.LM_STUDIO_SYNTHESIS_MODEL,
-        )
-        console.print(Panel(
-            Markdown(reading_text),
-            title="Reading Interpretation",
-            border_style="green",
-            padding=(1, 2),
-        ))
+        thinking_text = ""
+        content_text = ""
+        is_thinking = False
+
+        async for event_type, token in synthesize_reading_stream(
+            cast, passages, question, model=config.get_synthesis_model(),
+        ):
+            if event_type == "thinking":
+                if not is_thinking:
+                    is_thinking = True
+                    console.print("[dim italic]Thinking...[/dim italic]", end="")
+                thinking_text += token
+                # Show thinking as dim, overwriting the same line area
+                console.print(f"[dim]{token}[/dim]", end="")
+            elif event_type == "thinking_done":
+                is_thinking = False
+                console.print()  # newline after thinking
+            elif event_type == "content":
+                content_text += token
+
+        if content_text.strip():
+            console.print(Panel(
+                Markdown(content_text.strip()),
+                title="Reading Interpretation",
+                border_style="green",
+                padding=(1, 2),
+            ))
+        else:
+            console.print("[yellow]Model produced no content (only thinking tokens).[/yellow]")
     except Exception as e:
         console.print(f"[red]LLM synthesis failed: {e}[/red]")
         console.print("[dim]Falling back to raw passages...[/dim]")
@@ -481,8 +502,9 @@ async def handle_conversation(session: Session, user_input: str):
     msg = response.choices[0].message
 
     if msg.content:
-        session.conversation_history.append({"role": "assistant", "content": msg.content})
-        console.print(Markdown(msg.content))
+        clean, _ = llm_client.strip_think_blocks(msg.content)
+        session.conversation_history.append({"role": "assistant", "content": clean})
+        console.print(Markdown(clean))
 
 
 async def repl_main():

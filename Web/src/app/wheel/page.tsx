@@ -26,6 +26,7 @@ import { PathwaySidebar, type PathwayStep } from "../../components/wheel/Pathway
 import { NeighborsSidebar } from "../../components/wheel/NeighborsSidebar";
 import { TrigramFilterSidebar } from "../../components/wheel/TrigramFilterSidebar";
 import { ElementsSidebar } from "../../components/wheel/ElementsSidebar";
+import { CompassSidebar } from "../../components/wheel/CompassSidebar";
 import { useDragRotation } from "../../hooks/useDragRotation";
 import { useHexagramTextCache } from "../../hooks/useHexagramTextCache";
 import { useViewBoxZoom } from "../../hooks/useViewBoxZoom";
@@ -78,6 +79,10 @@ export default function WheelPage() {
   // ── Elements mode state ──
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+
+  // ── Compass mode state ──
+  const [compassArrangement, setCompassArrangement] = useState<"earlier" | "later">("later");
+  const [selectedCompassTrigram, setSelectedCompassTrigram] = useState<string | null>(null);
 
   // ── Trigram hover state (works across modes) ──
   const [highlightedTrigram, setHighlightedTrigram] = useState<string | null>(null);
@@ -232,6 +237,14 @@ export default function WheelPage() {
           states.set(h.king_wen, matchSet.has(h.king_wen) ? "highlighted" : "dimmed");
         }
       }
+    } else if (mode === "compass") {
+      if (selectedCompassTrigram) {
+        const matching = findByTrigram(selectedCompassTrigram, "any");
+        const matchSet = new Set(matching.map((h) => h.king_wen));
+        for (const h of hexagrams) {
+          states.set(h.king_wen, matchSet.has(h.king_wen) ? "highlighted" : "dimmed");
+        }
+      }
     }
 
     return states;
@@ -242,6 +255,7 @@ export default function WheelPage() {
     pathwaySteps, neighborsSource, neighborsData, maxNeighborDistance,
     trigramFilter, filteredHexagrams,
     activeElement, elementHexagrams,
+    selectedCompassTrigram,
   ]);
 
   // ── Handle hexagram click ──
@@ -374,6 +388,7 @@ export default function WheelPage() {
     setTrigramFilter({ upper: null, lower: null });
     setSelectedElement(null);
     setHoveredElement(null);
+    setSelectedCompassTrigram(null);
     resetZoom();
   }, [resetZoom]);
 
@@ -440,6 +455,10 @@ export default function WheelPage() {
         return selectedElement
           ? `Showing hexagrams associated with ${selectedElement}`
           : "Click an element at the center of the wheel to explore Wu Xing relationships";
+      case "compass":
+        return selectedCompassTrigram
+          ? `${compassArrangement === "earlier" ? "Earlier" : "Later"} Heaven — showing hexagrams with selected trigram`
+          : `${compassArrangement === "earlier" ? "Earlier" : "Later"} Heaven arrangement — click a trigram to explore`;
       default:
         return "";
     }
@@ -495,7 +514,11 @@ export default function WheelPage() {
             onHexagramClick={handleHexagramClick}
             onHexagramHover={handleHexagramHover}
             onTrigramHover={handleTrigramHover}
-            onTrigramClick={mode === "trigram_filter" ? handleTrigramClick : undefined}
+            onTrigramClick={
+              mode === "trigram_filter" ? handleTrigramClick
+              : mode === "compass" ? (bits: string) => setSelectedCompassTrigram(bits)
+              : undefined
+            }
             onPointerDown={drag.onPointerDown}
             onPointerMove={drag.onPointerMove}
             onPointerUp={drag.onPointerUp}
@@ -777,6 +800,23 @@ export default function WheelPage() {
                 setSelectedHex(kw);
               }}
               onClear={() => setSelectedElement(null)}
+            />
+          </aside>
+        )}
+
+        {/* ── Compass mode sidebar ── */}
+        {mode === "compass" && (
+          <aside className="w-80 border-l border-border bg-surface p-6 overflow-y-auto animate-fade-in hidden lg:block">
+            <CompassSidebar
+              arrangement={compassArrangement}
+              onSetArrangement={setCompassArrangement}
+              selectedTrigram={selectedCompassTrigram}
+              onSelectTrigram={(bits) => setSelectedCompassTrigram(bits)}
+              onSelectHexagram={(kw) => {
+                setMode("explore");
+                setSelectedHex(kw);
+              }}
+              onClear={() => setSelectedCompassTrigram(null)}
             />
           </aside>
         )}

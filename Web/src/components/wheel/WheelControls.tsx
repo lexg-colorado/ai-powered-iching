@@ -6,7 +6,7 @@
 
 import { memo } from "react";
 
-export type WheelMode = "explore" | "transform" | "pathway" | "neighbors" | "trigram_filter" | "elements";
+export type WheelMode = "explore" | "transform" | "pathway" | "neighbors" | "trigram_filter" | "elements" | "compass";
 
 interface WheelControlsProps {
   mode: WheelMode;
@@ -94,6 +94,18 @@ function WheelControlsInner({
           title="Elements: explore Wu Xing (Five Elements) relationships and associated hexagrams"
         >
           Elements
+        </button>
+        <button
+          onClick={() => onModeChange("compass")}
+          className={`px-2 py-1.5 transition-colors border-l border-border ${
+            mode === "compass"
+              ? "bg-accent-yin/20 text-foreground font-medium"
+              : "bg-surface text-muted hover:text-foreground"
+          }`}
+          aria-pressed={mode === "compass"}
+          title="Compass: explore Earlier and Later Heaven trigram-direction arrangements"
+        >
+          Compass
         </button>
       </div>
 

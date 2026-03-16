@@ -362,3 +362,77 @@ export function getHexagramsByElement(elementName: string): HexagramData[] {
 export function getElementForHexagram(kingWen: number): string | null {
   return HEXAGRAM_PRIMARY_ELEMENT[kingWen] ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Compass mode — Earlier & Later Heaven trigram arrangements
+// ---------------------------------------------------------------------------
+
+export interface CompassTrigramInfo {
+  bits: string;
+  name: string;
+  attribute: string;
+  direction: string;
+  season: string;
+  family: string;
+  animal: string;
+  bodyPart: string;
+  element: string;
+  role: string;
+  oppositeBits: string;
+}
+
+/**
+ * Earlier Heaven (Fu Xi / Xian Tian) arrangement — ideal/cosmological order.
+ * Trigrams are placed in opposing complementary pairs.
+ */
+const EARLIER_HEAVEN: CompassTrigramInfo[] = [
+  { bits: "111", name: "Ch'ien", attribute: "Heaven", direction: "S",  season: "", family: "Father",       animal: "Horse",   bodyPart: "Head",    element: "Metal", role: "Creative force, pure yang", oppositeBits: "000" },
+  { bits: "000", name: "K'un",   attribute: "Earth",  direction: "N",  season: "", family: "Mother",       animal: "Ox",      bodyPart: "Belly",   element: "Earth", role: "Receptive force, pure yin", oppositeBits: "111" },
+  { bits: "101", name: "Li",     attribute: "Fire",   direction: "E",  season: "", family: "Middle Daughter", animal: "Pheasant", bodyPart: "Eye",    element: "Fire",  role: "Clinging, illumination",   oppositeBits: "010" },
+  { bits: "010", name: "K'an",   attribute: "Water",  direction: "W",  season: "", family: "Middle Son",    animal: "Pig",     bodyPart: "Ear",     element: "Water", role: "Abysmal, depth",           oppositeBits: "101" },
+  { bits: "011", name: "Tui",    attribute: "Lake",   direction: "SE", season: "", family: "Youngest Daughter", animal: "Sheep", bodyPart: "Mouth",  element: "Metal", role: "Joyous, reflection",       oppositeBits: "100" },
+  { bits: "100", name: "Ken",    attribute: "Mountain", direction: "NW", season: "", family: "Youngest Son", animal: "Dog",     bodyPart: "Hand",    element: "Earth", role: "Keeping still, meditation", oppositeBits: "011" },
+  { bits: "001", name: "Chen",   attribute: "Thunder", direction: "NE", season: "", family: "Eldest Son",   animal: "Dragon",  bodyPart: "Foot",    element: "Wood",  role: "Arousing, initiation",     oppositeBits: "110" },
+  { bits: "110", name: "Sun",    attribute: "Wind",   direction: "SW", season: "", family: "Eldest Daughter", animal: "Fowl",   bodyPart: "Thigh",   element: "Wood",  role: "Gentle, penetration",      oppositeBits: "001" },
+];
+
+/**
+ * Later Heaven (King Wen / Hou Tian) arrangement — seasonal/practical order.
+ * Trigrams follow the cycle of the year and the Wu Xing elements.
+ */
+const LATER_HEAVEN: CompassTrigramInfo[] = [
+  { bits: "101", name: "Li",     attribute: "Fire",     direction: "S",  season: "Summer",         family: "Middle Daughter", animal: "Pheasant", bodyPart: "Eye",   element: "Fire",  role: "Midday, full illumination",   oppositeBits: "010" },
+  { bits: "010", name: "K'an",   attribute: "Water",    direction: "N",  season: "Winter",         family: "Middle Son",      animal: "Pig",      bodyPart: "Ear",   element: "Water", role: "Midnight, deep stillness",    oppositeBits: "101" },
+  { bits: "001", name: "Chen",   attribute: "Thunder",  direction: "E",  season: "Spring",         family: "Eldest Son",      animal: "Dragon",   bodyPart: "Foot",  element: "Wood",  role: "Sunrise, new beginning",      oppositeBits: "011" },
+  { bits: "011", name: "Tui",    attribute: "Lake",     direction: "W",  season: "Autumn",         family: "Youngest Daughter", animal: "Sheep",  bodyPart: "Mouth", element: "Metal", role: "Harvest, joyous gathering",   oppositeBits: "001" },
+  { bits: "110", name: "Sun",    attribute: "Wind",     direction: "SE", season: "Late Spring",    family: "Eldest Daughter",  animal: "Fowl",     bodyPart: "Thigh", element: "Wood",  role: "Growth, gentle penetration",  oppositeBits: "111" },
+  { bits: "111", name: "Ch'ien", attribute: "Heaven",   direction: "NW", season: "Late Autumn",    family: "Father",           animal: "Horse",    bodyPart: "Head",  element: "Metal", role: "Creative judgment, authority", oppositeBits: "000" },
+  { bits: "000", name: "K'un",   attribute: "Earth",    direction: "SW", season: "Late Summer",    family: "Mother",           animal: "Ox",       bodyPart: "Belly", element: "Earth", role: "Nourishment, receptivity",    oppositeBits: "100" },
+  { bits: "100", name: "Ken",    attribute: "Mountain", direction: "NE", season: "Late Winter",    family: "Youngest Son",     animal: "Dog",      bodyPart: "Hand",  element: "Earth", role: "Transition, keeping still",   oppositeBits: "000" },
+];
+
+export const COMPASS_DATA: {
+  earlier: CompassTrigramInfo[];
+  later: CompassTrigramInfo[];
+} = {
+  earlier: EARLIER_HEAVEN,
+  later: LATER_HEAVEN,
+};
+
+/** The four opposing pair axes (same pairs in both arrangements) */
+export const COMPASS_PAIR_AXES = [
+  { a: "111", b: "000", label: "Heaven / Earth",  aName: "Ch'ien", bName: "K'un" },
+  { a: "101", b: "010", label: "Fire / Water",    aName: "Li",     bName: "K'an" },
+  { a: "001", b: "110", label: "Thunder / Wind",  aName: "Chen",   bName: "Sun" },
+  { a: "100", b: "011", label: "Mountain / Lake", aName: "Ken",    bName: "Tui" },
+] as const;
+
+/**
+ * Look up compass info for a trigram in a given arrangement.
+ */
+export function getCompassTrigram(
+  arrangement: "earlier" | "later",
+  bits: string,
+): CompassTrigramInfo | undefined {
+  return COMPASS_DATA[arrangement].find((t) => t.bits === bits);
+}

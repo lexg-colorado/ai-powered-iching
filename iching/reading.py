@@ -287,6 +287,118 @@ def _passages_text(results: list[dict], label: str) -> str:
     return "\n".join(parts) + "\n"
 
 
+def _build_system_prompt(q_type: str) -> str:
+    """Build the system prompt incorporating the reading guide and Shuo Kua."""
+
+    # Load the reading guide as the foundation of the system prompt
+    reading_guide = hexagram_text.get_reading_guide()
+
+    _OPEN_PROMPT = (
+        "You are a learned I Ching interpreter. You synthesize traditional I Ching passages "
+        "and Wing commentaries into a coherent, insightful reading.\n\n"
+        "Follow this structure:\n\n"
+        "1. Begin with the primary hexagram's overall meaning (Judgment and Image). "
+        "Use the T'uan Chuan to explain *why* the Judgment counsels what it does — "
+        "identify the ruler line, the trigram interaction, and the structural logic.\n"
+        "2. Interpret each changing line in order from bottom to top, noting what stage "
+        "of the process it represents. Use the Hsiang Chuan line commentary to explain "
+        "the structural reason behind each line's counsel — correspondences, character-place "
+        "relationships, and position within the trigram.\n"
+        "3. Discuss the relating hexagram as the direction the situation moves toward. "
+        "Use the Tsa Kua for a sharp characterization and the Hsu Kua for narrative context.\n"
+        "4. If nuclear hexagram passages are provided, discuss the nuclear hexagram(s) "
+        "as the hidden inner dynamic — the unconscious undercurrent or deeper structural "
+        "tendency beneath the surface. Include the hexagram number in the heading, e.g. "
+        "'### Nuclear Hexagram of Primary (54): Kuei Mei / The Marrying Maiden'.\n"
+        "5. If Zong Gua (complement) passages are provided, conclude with the Zong Gua "
+        "as the polar opposite — what the situation is NOT, and by contrast, what it "
+        "fundamentally IS. Include the hexagram number in the heading, e.g. "
+        "'### Zong Gua (Complement) (44): Kou / Coming to Meet'.\n"
+        "6. If the querent asked a question, conclude with a '### Counsel' section that "
+        "directly addresses their question with concrete, practical guidance drawn from "
+        "all layers of the reading. Omit this section if no question was asked.\n\n"
+        "Principles:\n"
+        "- Always start from the hexagram source texts. The Wings deepen and explain.\n"
+        "- Use the T'uan Chuan and Hsiang Chuan as interpretive backbone.\n"
+        "- Use trigram symbolism from the Shuo Kua when it enriches interpretation.\n"
+        "- Speak with clarity, not mysticism. The Wings themselves are analytical — follow their example.\n"
+        "- Respect passage boundaries. Never conflate material from different hexagrams."
+    )
+
+    _YES_NO_PROMPT = (
+        "You are a learned I Ching interpreter. The querent has asked a yes/no question. "
+        "Your task is to give them a direct answer derived from the hexagram texts and "
+        "Wing commentaries, followed by a focused explanation.\n\n"
+        "Step 1: READ the Judgment text carefully. Use the T'uan Chuan to understand "
+        "the structural logic. Identify specific language: 'success', 'it furthers', "
+        "'good fortune'? Or 'nothing furthers', 'misfortune', 'danger', 'withdraw'? "
+        "Caution or withdrawal language means NO or NOT YET — do NOT default to yes.\n"
+        "Step 2: Check the changing lines — do they reinforce or contradict the Judgment? "
+        "Use the Hsiang Chuan line commentaries for structural reasoning.\n"
+        "Step 3: COMMIT to your answer. Open with a single bold heading: "
+        "'## Yes', '## No', '## Yes, but...', '## No, unless...', or '## Not yet'. "
+        "Do NOT hedge or soften. The hexagram has spoken.\n"
+        "Step 4: Follow with a condensed explanation drawing from Judgment, changing "
+        "lines, and relating hexagram to explain WHY. Keep it focused and direct.\n"
+        "Step 5: Do NOT include nuclear hexagram or Zong Gua sections.\n"
+        "Step 6: End with a brief '### Counsel' section.\n\n"
+        "Use the retrieved passages as your source material. Speak with clarity and wisdom."
+    )
+
+    base_prompt = _YES_NO_PROMPT if q_type == "yes_no" else _OPEN_PROMPT
+
+    # Append key sections from the reading guide (not the full document — too large)
+    if reading_guide:
+        # Extract just the structural sections: line correspondences and four judgments
+        sections_to_include = []
+        for section_header in [
+            "## 5. Line Correspondences and Structural Relationships",
+            "## 6. The Four Judgments",
+        ]:
+            idx = reading_guide.find(section_header)
+            if idx != -1:
+                # Find the next ## heading or end of text
+                next_section = reading_guide.find("\n## ", idx + len(section_header))
+                section_text = reading_guide[idx:next_section] if next_section != -1 else reading_guide[idx:]
+                sections_to_include.append(section_text.strip())
+
+        if sections_to_include:
+            base_prompt += (
+                "\n\n--- Reference: Structural Relationships & Judgments ---\n"
+                + "\n\n".join(sections_to_include)
+            )
+
+    return base_prompt
+
+
+def _build_shuo_kua_context() -> str:
+    """Load the essential trigram reference from the Shuo Kua (Chapter III).
+
+    Skips the philosophical Chapters I and II to save context tokens.
+    Chapter III contains the practical trigram symbols: attributes, animals,
+    body parts, family relationships, and detailed symbolic associations.
+    """
+    shuo_kua = hexagram_text.get_shuo_kua()
+    if not shuo_kua:
+        return ""
+
+    # Extract from Chapter III onwards (the practical trigram reference)
+    ch3_marker = "#### CHAPTER III"
+    ch3_idx = shuo_kua.find(ch3_marker)
+    if ch3_idx != -1:
+        trimmed = shuo_kua[ch3_idx:]
+    else:
+        # Fallback: try to find the attributes section directly
+        attr_marker = "#### 7. The Attributes"
+        attr_idx = shuo_kua.find(attr_marker)
+        trimmed = shuo_kua[attr_idx:] if attr_idx != -1 else shuo_kua
+
+    return (
+        "\n\n--- Trigram Reference: Shuo Kua (Discussion of the Trigrams) ---\n"
+        + trimmed
+    )
+
+
 def build_interpretation_prompt(
     cast: CastResult,
     passages: dict[str, list[dict]],
@@ -299,7 +411,7 @@ def build_interpretation_prompt(
 
     # Describe the cast situation
     if num_changing == 0:
-        situation = "No lines are changing. The hexagram is stable -- interpret only the primary hexagram."
+        situation = "No lines are changing. The hexagram is stable — interpret only the primary hexagram."
     elif num_changing == 1:
         situation = f"One line is changing (line {cast.changing_lines[0]}). This is the focal point of the reading."
     elif num_changing <= 3:
@@ -307,33 +419,45 @@ def build_interpretation_prompt(
         situation = f"Lines {lines_str} are changing. Read them bottom to top as stages of the process."
     elif num_changing <= 5:
         lines_str = ", ".join(str(l) for l in cast.changing_lines)
-        situation = f"Lines {lines_str} are changing -- this indicates significant transformation and turbulence."
+        situation = f"Lines {lines_str} are changing — this indicates significant transformation and turbulence."
     else:
-        situation = "All six lines are changing -- a complete inversion. Focus on the relating hexagram as the primary message."
+        situation = "All six lines are changing — a complete inversion. Focus on the relating hexagram as the primary message."
 
-    # Build the context from retrieved passages
+    # Build the context from retrieved passages — Layer 1 (hexagram text) + Layer 2 (Wings)
     context_parts = []
-    context_parts.append(_passages_text(passages.get("primary", []),
-                                        f"Hexagram {primary.king_wen} -- {primary.name} / {primary.title}"))
 
+    # Primary hexagram
+    context_parts.append(_passages_text(passages.get("primary", []),
+                                        f"Hexagram {primary.king_wen} — {primary.name} / {primary.title}"))
+    # Primary Wings (T'uan Chuan, Tsa Kua, Sequence)
+    context_parts.append(_passages_text(passages.get("primary_wings", []),
+                                        f"Wings — Hexagram {primary.king_wen} ({primary.name})"))
+
+    # Changing lines (text + Wing commentary paired together)
     for line in sorted(cast.changing_lines):
         val = cast.line_values[line - 1]
         prefix = "Nine" if val == 9 else "Six"
         stage = LINE_STAGES.get(line, "")
-        label = f"{prefix} in the {ORDINALS[line]} place (line {line} -- {stage})"
+        label = f"{prefix} in the {ORDINALS[line]} place (line {line} — {stage})"
         context_parts.append(_passages_text(passages.get(f"line_{line}", []), label))
+        # Wing line commentary
+        wing_label = f"Hsiang Chuan — {prefix} in the {ORDINALS[line]} place (line {line})"
+        context_parts.append(_passages_text(passages.get(f"line_{line}_wings", []), wing_label))
 
+    # Relating hexagram
     if cast.relating:
         rel = cast.relating
         context_parts.append(_passages_text(passages.get("relating", []),
-                                            f"Relating Hexagram {rel.king_wen} -- {rel.name} / {rel.title}"))
+                                            f"Relating Hexagram {rel.king_wen} — {rel.name} / {rel.title}"))
+        context_parts.append(_passages_text(passages.get("relating_wings", []),
+                                            f"Wings — Relating Hexagram {rel.king_wen} ({rel.name})"))
 
     # Nuclear hexagrams (hidden inner dynamic)
     if cast.nuclear:
         nuc = cast.nuclear
         context_parts.append(_passages_text(
             passages.get("nuclear_primary", []),
-            f"Nuclear Hexagram of Primary -- #{nuc.king_wen} {nuc.name} / {nuc.title} (hidden inner dynamic)",
+            f"Nuclear Hexagram of Primary — #{nuc.king_wen} {nuc.name} / {nuc.title} (hidden inner dynamic)",
         ))
 
     if passages.get("nuclear_relating") and cast.relating:
@@ -341,7 +465,7 @@ def build_interpretation_prompt(
         if rel_nuc:
             context_parts.append(_passages_text(
                 passages["nuclear_relating"],
-                f"Nuclear Hexagram of Relating -- #{rel_nuc.king_wen} {rel_nuc.name} / {rel_nuc.title} (hidden inner dynamic)",
+                f"Nuclear Hexagram of Relating — #{rel_nuc.king_wen} {rel_nuc.name} / {rel_nuc.title} (hidden inner dynamic)",
             ))
 
     # Zong Gua (complement hexagram)
@@ -349,80 +473,34 @@ def build_interpretation_prompt(
         zong = cast.zong_gua
         context_parts.append(_passages_text(
             passages["zong_gua"],
-            f"Zong Gua (Complement) -- #{zong.king_wen} {zong.name} / {zong.title} (polar opposite / shadow)",
+            f"Zong Gua (Complement) — #{zong.king_wen} {zong.name} / {zong.title} (polar opposite / shadow)",
         ))
 
-    retrieved_text = "\n".join(context_parts)
+    retrieved_text = "\n".join(p for p in context_parts if p.strip())
 
-    # Classify question type in Python -- the LLM only sees the relevant prompt
+    # Classify question type
     q_type = classify_question(question)
 
-    _OPEN_PROMPT = (
-        "You are a learned I Ching interpreter. You synthesize traditional I Ching passages "
-        "into a coherent, insightful reading.\n\n"
-        "Follow this structure:\n\n"
-        "1. Begin with the primary hexagram's overall meaning (Judgment and Image).\n"
-        "2. Interpret each changing line in order from bottom to top, noting what stage "
-        "of the process it represents.\n"
-        "3. Discuss the relating hexagram as the direction the situation moves toward.\n"
-        "4. If nuclear hexagram passages are provided, discuss the nuclear hexagram(s) "
-        "as the hidden inner dynamic -- the unconscious undercurrent or deeper structural "
-        "tendency beneath the surface of the situation. The nuclear hexagram reveals what "
-        "persists beneath the changes. Include the hexagram number in the heading, e.g. "
-        "'### Nuclear Hexagram of Primary (54): Kuei Mei / The Marrying Maiden'.\n"
-        "5. If Zong Gua (complement) passages are provided, conclude with the Zong Gua "
-        "as the polar opposite -- the shadow or inverse quality that provides contrast "
-        "and deeper understanding. The Zong Gua reveals what the situation is NOT, and "
-        "by contrast, what it fundamentally IS. Include the hexagram number in the heading, "
-        "e.g. '### Zong Gua (Complement) (44): Kou / Coming to Meet'.\n"
-        "6. If the querent asked a question, conclude with a '### Counsel' section that "
-        "directly addresses their question. Draw from the primary hexagram, changing lines, "
-        "relating hexagram, and any deeper patterns revealed by the nuclear or Zong Gua "
-        "to offer concrete, practical guidance for their specific situation. This section "
-        "should feel like a wise advisor speaking directly to the querent. Omit this "
-        "section entirely if no question was asked.\n\n"
-        "Use the retrieved passages as your source material. If passages are missing, "
-        "acknowledge it gracefully. Speak with clarity and wisdom, not mysticism. "
-        "Keep the reading grounded and practical."
-    )
+    # Build system prompt with reading guide
+    system_prompt = _build_system_prompt(q_type)
 
-    _YES_NO_PROMPT = (
-        "You are a learned I Ching interpreter. The querent has asked a yes/no question. "
-        "Your task is to give them a direct answer derived from the hexagram texts, "
-        "followed by a focused explanation.\n\n"
-        "Step 1: READ the Judgment text carefully. Identify the specific language: does it "
-        "say 'success', 'it furthers', 'good fortune', 'perseverance brings reward'? Or does "
-        "it say 'nothing furthers', 'misfortune', 'danger', 'not yet', 'withdraw', 'wait', "
-        "'let go', 'release', 'dissolve'? Caution, release, dissolution, or withdrawal "
-        "language means NO or NOT YET -- do NOT default to yes.\n"
-        "Step 2: Check the changing lines -- do they reinforce or contradict the Judgment?\n"
-        "Step 3: COMMIT to your answer. Open the reading with a single bold heading: "
-        "'## Yes', '## No', '## Yes, but...', '## No, unless...', or '## Not yet'. "
-        "Do NOT hedge or soften. The hexagram has spoken.\n"
-        "Step 4: Follow with a condensed explanation drawing from the Judgment, key changing "
-        "lines, and relating hexagram to explain WHY. Keep it focused and direct.\n"
-        "Step 5: Do NOT include nuclear hexagram or Zong Gua sections. They add depth but "
-        "dilute the directness that a yes/no question demands.\n"
-        "Step 6: End with a brief '### Counsel' section that speaks to the querent's "
-        "specific situation.\n\n"
-        "Use the retrieved passages as your source material. Speak with clarity and wisdom."
-    )
+    # Add Shuo Kua as trigram reference context
+    system_prompt += _build_shuo_kua_context()
 
-    system_prompt = _YES_NO_PROMPT if q_type == "yes_no" else _OPEN_PROMPT
-
+    # Build user message
     user_content = f"Cast result:\n"
-    user_content += f"Primary: Hexagram {primary.king_wen} -- {primary.name} / {primary.title}\n"
+    user_content += f"Primary: Hexagram {primary.king_wen} — {primary.name} / {primary.title}\n"
     if cast.relating:
-        user_content += f"Relating: Hexagram {cast.relating.king_wen} -- {cast.relating.name} / {cast.relating.title}\n"
+        user_content += f"Relating: Hexagram {cast.relating.king_wen} — {cast.relating.name} / {cast.relating.title}\n"
     user_content += f"Changing lines: {', '.join(str(l) for l in cast.changing_lines) or 'none'}\n"
     if cast.nuclear:
-        user_content += f"Nuclear (primary): Hexagram {cast.nuclear.king_wen} -- {cast.nuclear.name} / {cast.nuclear.title}\n"
+        user_content += f"Nuclear (primary): Hexagram {cast.nuclear.king_wen} — {cast.nuclear.name} / {cast.nuclear.title}\n"
     if cast.relating:
         rel_nuc = nuclear_hexagram(cast.relating.binary)
         if rel_nuc:
-            user_content += f"Nuclear (relating): Hexagram {rel_nuc.king_wen} -- {rel_nuc.name} / {rel_nuc.title}\n"
+            user_content += f"Nuclear (relating): Hexagram {rel_nuc.king_wen} — {rel_nuc.name} / {rel_nuc.title}\n"
     if cast.zong_gua:
-        user_content += f"Zong Gua (complement): Hexagram {cast.zong_gua.king_wen} -- {cast.zong_gua.name} / {cast.zong_gua.title}\n"
+        user_content += f"Zong Gua (complement): Hexagram {cast.zong_gua.king_wen} — {cast.zong_gua.name} / {cast.zong_gua.title}\n"
     user_content += f"\n{situation}\n"
 
     if question:

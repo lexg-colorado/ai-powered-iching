@@ -98,7 +98,7 @@ Each passage block is capped at 800 characters. The line labels include symbolic
 
 The assembled prompt goes to `llm_client.chat()` (or `chat_stream()` for the web UI):
 
-- **Model:** `qwen2.5-14b-instruct` via LM Studio
+- **Model:** `qwen2.5-14b-instruct-mlx` via LM Studio
 - **Temperature:** 0.7
 - **Max tokens:** 2048
 

@@ -25,13 +25,7 @@ from iching import llm_client
 # Question-type classifier (runs in Python, NOT in the LLM)
 # ---------------------------------------------------------------------------
 
-# Wh-words that make a question open-ended regardless of other content
-_WH_PATTERN = re.compile(
-    r"^\s*(when|where|how|what|which|who|why)\b",
-    re.IGNORECASE,
-)
-
-# Patterns that indicate a true yes/no question (only checked when no Wh-word)
+# Yes/no starters — highest priority, unambiguous
 _YES_NO_PATTERNS = re.compile(
     r"^\s*(should\s+I|will\s+(this|it|that|I|we|my)|is\s+(it|this|that)|"
     r"can\s+I|am\s+I|are\s+(we|they|you)|do\s+I|does\s+(this|it|that)|"
@@ -39,24 +33,101 @@ _YES_NO_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+# Wh-words that route to "open" (excludes "what" and "why" which get special handling)
+_WH_OPEN_PATTERN = re.compile(
+    r"^\s*(when|where|how|which|who)\b",
+    re.IGNORECASE,
+)
+
+# Diagnostic keywords — checked before wh-word routing so
+# "What is blocking me?" goes diagnostic, not reflective
+_DIAGNOSTIC_KEYWORDS = re.compile(
+    r"block(ing|ed)?|stuck|break(ing)?\s+down|keeps?\s+happen|going\s+wrong|"
+    r"root\s+cause|what('s|s)\s+wrong|falling\s+apart|not\s+working|"
+    r"keep\s+fail|obstacle|barrier|holding\s+(me|us|it)\s+back|"
+    r"prevent(ing)?|the\s+problem",
+    re.IGNORECASE,
+)
+
+# Reflective keywords — introspective, self-referential
+_REFLECTIVE_KEYWORDS = re.compile(
+    r"(not|am\s+I)\s+seeing|reveal|about\s+(me|myself)|"
+    r"need\s+to\s+(learn|understand|know|focus)|focus\s+on|"
+    r"teach(ing)?\s+me|tell(ing)?\s+me\s+about\s+(myself|me)|"
+    r"blind\s+spot|my\s+(shadow|blind|pattern|lesson|growth|role\s+in)|"
+    r"behind\s+(my|that|this)\s+(reaction|behavior|feeling)|"
+    r"what\s+(does|is)\s+this\s+(reveal|teach|show|mean\s+for\s+me)",
+    re.IGNORECASE,
+)
+
+# Verb starters that indicate a question/command even without wh-words
+_VERB_STARTER = re.compile(
+    r"^\s*(tell|explain|describe|show|help)\b",
+    re.IGNORECASE,
+)
+
 
 def classify_question(question: str | None) -> str:
-    """Classify a question as 'yes_no', 'open', or 'none'.
+    """Classify a question into one of six types.
 
-    Rules:
-      1. No question → 'none'
-      2. Starts with a Wh-word (when, where, how, etc.) → 'open'
-      3. Matches a yes/no starter pattern → 'yes_no'
-      4. Everything else → 'open'
+    Types:
+      - 'none':        No input provided
+      - 'yes_no':      Binary decision question (should I, will this, is it...)
+      - 'diagnostic':  Seeking root causes, blockages, patterns (why, what's blocking...)
+      - 'reflective':  Self-knowledge, blind spots, inner states (what am I not seeing...)
+      - 'open':        Practical guidance (how, when, where, who, which...)
+      - 'topic':       Not a question — a situation, person, place, or thing
+
+    Detection priority:
+      1. Empty/null → none
+      2. Yes/no starters → yes_no
+      3. Diagnostic keywords → diagnostic
+      4. Starts with "why" → diagnostic
+      5. Starts with "what" + reflective keywords → reflective
+      6. Starts with "what" (without reflective markers) → open
+      7. Other wh-words (how, when, where, which, who) → open
+      8. Reflective keywords (without wh-word) → reflective
+      9. Has question mark or verb starter → open
+     10. Default fallback → topic
     """
     if not question or not question.strip():
         return "none"
+
     q = question.strip()
-    if _WH_PATTERN.match(q):
-        return "open"
+    q_lower = q.lower()
+
+    # 1. Yes/no starters (highest priority — unambiguous)
     if _YES_NO_PATTERNS.match(q):
         return "yes_no"
-    return "open"
+
+    # 2. Diagnostic keywords (before wh-word routing)
+    if _DIAGNOSTIC_KEYWORDS.search(q_lower):
+        return "diagnostic"
+
+    # 3. "Why" → almost always diagnostic in divination context
+    if re.match(r"^\s*why\b", q_lower):
+        return "diagnostic"
+
+    # 4. "What" — split between reflective and open
+    if re.match(r"^\s*what\b", q_lower):
+        if _REFLECTIVE_KEYWORDS.search(q_lower):
+            return "reflective"
+        return "open"
+
+    # 5. Other wh-words → open
+    if _WH_OPEN_PATTERN.match(q):
+        return "open"
+
+    # 6. Reflective keywords without wh-word ("tell me what I'm missing")
+    if _REFLECTIVE_KEYWORDS.search(q_lower):
+        return "reflective"
+
+    # 7. Looks like a question (question mark or imperative verb)
+    if q.endswith("?") or _VERB_STARTER.match(q):
+        return "open"
+
+    # 8. Default: it's a topic/situation, not a question
+    return "topic"
 
 
 # Line position symbolic meanings
@@ -345,7 +416,44 @@ def _build_system_prompt(q_type: str) -> str:
         "Use the retrieved passages as your source material. Speak with clarity and wisdom."
     )
 
-    base_prompt = _YES_NO_PROMPT if q_type == "yes_no" else _OPEN_PROMPT
+    _TOPIC_PROMPT = (
+        "You are a learned I Ching interpreter. The querent has not asked a question — "
+        "they have offered a topic, situation, person, or subject for the Oracle to address. "
+        "Your task is to illuminate the nature and dynamics of the subject through the hexagram.\n\n"
+        "Follow this structure:\n\n"
+        "1. Begin with the primary hexagram's overall meaning (Judgment and Image). "
+        "Use the T'uan Chuan to explain the structural logic. Frame the interpretation "
+        "as the Oracle speaking to the nature of the subject — what it is, what forces "
+        "are at work, what dynamics are in play.\n"
+        "2. Interpret each changing line in order from bottom to top, noting what stage "
+        "of the process it represents. Use the Hsiang Chuan line commentary for structural "
+        "reasoning. Each line reveals a facet of the subject's current state.\n"
+        "3. Discuss the relating hexagram as the direction the situation moves toward. "
+        "Use the Tsa Kua for a sharp characterization and the Hsu Kua for narrative context.\n"
+        "4. If nuclear hexagram passages are provided, discuss the nuclear hexagram(s) "
+        "as the hidden inner dynamic — what is really going on beneath the surface of "
+        "this subject. Include the hexagram number in the heading.\n"
+        "5. If Zong Gua (complement) passages are provided, conclude with the Zong Gua "
+        "as the polar opposite — what this subject is NOT, and by contrast, what it "
+        "fundamentally IS. Include the hexagram number in the heading.\n"
+        "6. Do NOT include a Counsel section. The querent did not ask a question — "
+        "they asked the Oracle to speak to a subject. End the reading with the final "
+        "hexagram layer (Zong Gua, or nuclear if no Zong Gua is provided).\n\n"
+        "Principles:\n"
+        "- The Oracle speaks to the subject with authority, not as if answering a question.\n"
+        "- Illuminate rather than advise. Describe the nature, dynamics, and trajectory.\n"
+        "- Always start from the hexagram source texts. The Wings deepen and explain.\n"
+        "- Use the T'uan Chuan and Hsiang Chuan as interpretive backbone.\n"
+        "- Use trigram symbolism from the Shuo Kua when it enriches interpretation.\n"
+        "- Speak with clarity, not mysticism.\n"
+        "- Respect passage boundaries. Never conflate material from different hexagrams."
+    )
+
+    _prompts = {
+        "yes_no": _YES_NO_PROMPT,
+        "topic": _TOPIC_PROMPT,
+    }
+    base_prompt = _prompts.get(q_type, _OPEN_PROMPT)
 
     # Append key sections from the reading guide (not the full document — too large)
     if reading_guide:
@@ -504,7 +612,10 @@ def build_interpretation_prompt(
     user_content += f"\n{situation}\n"
 
     if question:
-        user_content += f"\nThe querent's question: {question}\n"
+        if q_type == "topic":
+            user_content += f"\nThe subject of the reading: {question}\n"
+        else:
+            user_content += f"\nThe querent's question: {question}\n"
 
     user_content += f"\n--- Retrieved Source Passages ---\n{retrieved_text}\n"
     user_content += "\nPlease synthesize a reading interpretation from these passages."

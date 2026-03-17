@@ -38,6 +38,8 @@ import {
   findNeighbors,
   filterByTrigramPair,
   getHexagramsByElement,
+  getElementForHexagram,
+  getCompassTrigram,
   type HexagramRelationships,
   type TransformationInfo,
   type NeighborEntry,
@@ -561,11 +563,51 @@ export default function WheelPage() {
               <span className="text-xs font-mono text-muted">Binary: {relationships.source.binary}</span>
             </div>
 
-            {/* Trigrams */}
-            <div className="mb-6 text-sm">
-              <div className="text-muted mb-1">Upper: {relationships.source.upper_trigram}</div>
-              <div className="text-muted">Lower: {relationships.source.lower_trigram}</div>
-            </div>
+            {/* Trigrams — enriched with compass and Shuo Kua data */}
+            {(() => {
+              const upperBits = relationships.source.binary.slice(0, 3);
+              const lowerBits = relationships.source.binary.slice(3, 6);
+              const upper = getCompassTrigram("later", upperBits);
+              const lower = getCompassTrigram("later", lowerBits);
+              const element = getElementForHexagram(relationships.source.king_wen);
+              const elementColors: Record<string, string> = {
+                Fire: "#c4420a", Earth: "#b8860b", Metal: "#9ca3af", Water: "#2563eb", Wood: "#4a8b3f",
+              };
+
+              return (
+                <>
+                  <h3 className="text-sm font-heading text-foreground mb-2 border-b border-border pb-1">
+                    Trigrams
+                  </h3>
+                  <div className="mb-4 space-y-2 text-xs">
+                    {[{ label: "Upper", info: upper }, { label: "Lower", info: lower }].map(({ label, info }) => (
+                      <div key={label}>
+                        <div className="text-foreground font-medium">{label}: {info?.name} ({info?.attribute})</div>
+                        <div className="text-muted ml-2">
+                          {info?.direction} · {info?.season || "—"} · {info?.family} · {info?.animal}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Wu Xing Element */}
+                  <div className="mb-4 text-xs">
+                    <span className="text-muted">Element: </span>
+                    <span className="font-medium" style={{ color: element ? elementColors[element] : undefined }}>
+                      {element ?? "—"}
+                    </span>
+                  </div>
+
+                  {/* Compass Direction */}
+                  <div className="mb-6 text-xs">
+                    <span className="text-muted">Compass: </span>
+                    <span className="text-foreground">
+                      {upper?.direction ?? "?"} (upper) · {lower?.direction ?? "?"} (lower)
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Relationships */}
             <h3 className="text-sm font-heading text-foreground mb-3 border-b border-border pb-1">

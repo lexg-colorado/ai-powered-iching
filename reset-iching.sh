@@ -222,7 +222,7 @@ do_start() {
         # shellcheck disable=SC1091
         source "$VENV_DIR/bin/activate"
         cd "$PROJECT_ROOT/api"
-        exec uvicorn server:app --reload --port "$BACKEND_PORT"
+        exec uvicorn server:app --reload --host 0.0.0.0 --port "$BACKEND_PORT"
     ) > "$BACKEND_LOG" 2>&1 &
     local backend_pid=$!
 
@@ -230,7 +230,7 @@ do_start() {
     step "Starting frontend (Next.js on port $FRONTEND_PORT)..."
     (
         cd "$PROJECT_ROOT/Web"
-        exec npm run dev
+        exec npm run dev -- -H 0.0.0.0
     ) > "$FRONTEND_LOG" 2>&1 &
     local frontend_pid=$!
 

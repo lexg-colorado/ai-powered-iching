@@ -9,6 +9,8 @@ import type { LineValue } from "@/lib/types";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import { wrapCollapsibleSections } from "@/lib/markdownTransform";
+import { getElementsForHexagram, getCompassTrigram } from "@/lib/wheelRelationships";
+import MiniWheel from "./MiniWheel";
 
 interface ReadingResultProps {
   castResult: ClientCastResult;
@@ -113,8 +115,9 @@ export default function ReadingResult({
         )}
       </div>
 
-      {/* Cast details */}
-      <div className="space-y-3">
+      {/* Cast details + mini wheel */}
+      <div className="flex gap-12 items-center justify-center">
+        <div className="space-y-3 max-w-md">
         <h3 className="font-heading text-lg font-semibold text-foreground">
           Primary: {primary.king_wen}. {primary.name} / {primary.title}
         </h3>
@@ -161,6 +164,48 @@ export default function ReadingResult({
             Zong Gua: #{castResult.zongGua.king_wen} {castResult.zongGua.name} / {castResult.zongGua.title}
           </p>
         )}
+
+        {/* Element and compass direction */}
+        {(() => {
+          const upperBits = primary.binary.slice(0, 3);
+          const lowerBits = primary.binary.slice(3, 6);
+          const upper = getCompassTrigram("later", upperBits);
+          const lower = getCompassTrigram("later", lowerBits);
+          const elements = getElementsForHexagram(primary.king_wen);
+          const elementColors: Record<string, string> = {
+            Fire: "#c4420a", Earth: "#b8860b", Metal: "#9ca3af", Water: "#2563eb", Wood: "#4a8b3f",
+          };
+
+          return (
+            <div className="flex gap-4 mt-2">
+              {elements.length > 0 && (
+                <p className="text-xs text-muted">
+                  Element: {elements.map((el, i) => (
+                    <span key={el}>
+                      {i > 0 && ", "}
+                      <span className="font-medium" style={{ color: elementColors[el] }}>{el}</span>
+                    </span>
+                  ))}
+                </p>
+              )}
+              {upper && lower && (
+                <p className="text-xs text-muted">
+                  Direction: {upper.direction} (upper) · {lower.direction} (lower)
+                </p>
+              )}
+            </div>
+          );
+        })()}
+        </div>
+
+        {/* Mini wheel — position in King Wen sequence */}
+        <div className="hidden sm:flex flex-shrink-0 items-center">
+          <MiniWheel
+            primaryKingWen={primary.king_wen}
+            relatingKingWen={relating?.king_wen}
+            size={220}
+          />
+        </div>
       </div>
 
       {/* Interpretation */}

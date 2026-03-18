@@ -23,6 +23,8 @@ interface WuXingCenterProps {
   selectedElement?: string | null;
   /** Currently hovered element name (elements mode) */
   hoveredElement?: string | null;
+  /** Additional highlighted elements (e.g., from hexagram hover showing associated elements) */
+  highlightedElements?: string[];
   /** Whether element interactivity is enabled */
   interactive?: boolean;
   onElementClick?: (name: string) => void;
@@ -51,6 +53,7 @@ function WuXingCenterInner({
   scale,
   selectedElement,
   hoveredElement,
+  highlightedElements,
   interactive = false,
   onElementClick,
   onElementHover,
@@ -168,7 +171,7 @@ function WuXingCenterInner({
         const lx = el.x + (dx / dist) * labelOffset;
         const ly = el.y + (dy / dist) * labelOffset;
 
-        const isActive = activeElement === el.name;
+        const isActive = activeElement === el.name || highlightedElements?.includes(el.name) === true;
         const isRelated = cycleInfo
           ? [cycleInfo.generates, cycleInfo.generatedBy, cycleInfo.overcomes, cycleInfo.overcomeBy].includes(el.name)
           : false;

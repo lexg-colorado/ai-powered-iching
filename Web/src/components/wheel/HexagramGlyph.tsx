@@ -20,7 +20,8 @@ export type GlyphState =
   | "neighbor_d1"
   | "neighbor_d2"
   | "neighbor_d3"
-  | "filtered";
+  | "filtered"
+  | "highlighted_secondary";
 
 interface HexagramGlyphProps {
   /** Position on the SVG canvas */
@@ -70,6 +71,7 @@ const STATE_STYLES: Record<
   neighbor_d2: { opacity: 0.7, lineColor: "var(--accent-changing)", textColor: "var(--accent-changing)", glow: false },
   neighbor_d3: { opacity: 0.5, lineColor: "var(--accent-yin)", textColor: "var(--accent-yin)", glow: false },
   filtered: { opacity: 1, lineColor: "var(--accent-primary)", textColor: "var(--accent-primary)", glow: false },
+  highlighted_secondary: { opacity: 0.5, lineColor: "var(--accent-primary)", textColor: "var(--accent-primary)", glow: false },
 };
 
 function HexagramGlyphInner({

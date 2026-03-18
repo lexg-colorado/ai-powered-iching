@@ -321,46 +321,65 @@ export function getElementRelationships(name: string): ElementRelationships {
   };
 }
 
-/**
- * Primary element for each hexagram (King Wen number → element name).
- *
- * Derived from the traditional trigram-to-element mapping with balance-aware
- * tiebreaking: when a hexagram's two trigrams belong to different elements,
- * it is assigned to the less-populated element. This produces a near-equal
- * 13-13-13-13-12 distribution while ensuring every assignment is backed
- * by a genuine trigram association.
- */
-const HEXAGRAM_PRIMARY_ELEMENT: Record<number, string> = {
-  1: "Metal", 2: "Earth", 3: "Water", 4: "Water", 5: "Water",
-  6: "Water", 7: "Water", 8: "Water", 9: "Wood", 10: "Metal",
-  11: "Earth", 12: "Earth", 13: "Fire", 14: "Fire", 15: "Earth",
-  16: "Earth", 17: "Wood", 18: "Earth", 19: "Earth", 20: "Earth",
-  21: "Fire", 22: "Fire", 23: "Earth", 24: "Earth", 25: "Wood",
-  26: "Earth", 27: "Earth", 28: "Wood", 29: "Water", 30: "Fire",
-  31: "Metal", 32: "Wood", 33: "Metal", 34: "Wood", 35: "Fire",
-  36: "Fire", 37: "Fire", 38: "Fire", 39: "Water", 40: "Water",
-  41: "Metal", 42: "Wood", 43: "Metal", 44: "Metal", 45: "Metal",
-  46: "Wood", 47: "Water", 48: "Water", 49: "Fire", 50: "Fire",
-  51: "Wood", 52: "Earth", 53: "Wood", 54: "Metal", 55: "Fire",
-  56: "Fire", 57: "Wood", 58: "Metal", 59: "Wood", 60: "Metal",
-  61: "Metal", 62: "Wood", 63: "Water", 64: "Water",
-};
-
-/**
- * Get all hexagrams whose primary element matches the given element name.
- * Each hexagram belongs to exactly one element (single-assignment).
- */
-export function getHexagramsByElement(elementName: string): HexagramData[] {
-  return allHexagrams().filter(
-    (h) => HEXAGRAM_PRIMARY_ELEMENT[h.king_wen] === elementName,
-  );
+/** Reverse lookup: trigram bits → element name */
+const _TRIGRAM_TO_ELEMENT: Record<string, string> = {};
+for (const [element, bits] of Object.entries(WU_XING_TRIGRAM_MAP)) {
+  for (const b of bits) _TRIGRAM_TO_ELEMENT[b] = element;
 }
 
 /**
- * Get the primary element for a given hexagram.
+ * Get all elements associated with a hexagram (1-2 elements, derived from trigrams).
+ */
+export function getElementsForHexagram(kingWen: number): string[] {
+  const hex = allHexagrams().find((h) => h.king_wen === kingWen);
+  if (!hex) return [];
+  const upper = _TRIGRAM_TO_ELEMENT[hex.binary.slice(0, 3)];
+  const lower = _TRIGRAM_TO_ELEMENT[hex.binary.slice(3, 6)];
+  if (!upper && !lower) return [];
+  if (upper === lower) return upper ? [upper] : [];
+  return [upper, lower].filter(Boolean) as string[];
+}
+
+/**
+ * Get the primary element for a hexagram (first/upper trigram's element).
+ * @deprecated Use getElementsForHexagram() for full associations.
  */
 export function getElementForHexagram(kingWen: number): string | null {
-  return HEXAGRAM_PRIMARY_ELEMENT[kingWen] ?? null;
+  const elements = getElementsForHexagram(kingWen);
+  return elements[0] ?? null;
+}
+
+/**
+ * Get all hexagrams associated with an element (via trigram membership).
+ * A hexagram is associated if either its upper or lower trigram belongs
+ * to the element.
+ */
+export function getHexagramsByElement(elementName: string): HexagramData[] {
+  const bits = WU_XING_TRIGRAM_MAP[elementName] ?? [];
+  if (bits.length === 0) return [];
+  const resultSet = new Set<number>();
+  for (const b of bits) {
+    for (const h of findByTrigram(b, "any")) {
+      resultSet.add(h.king_wen);
+    }
+  }
+  return allHexagrams().filter((h) => resultSet.has(h.king_wen));
+}
+
+/**
+ * Check how strongly a hexagram is associated with an element.
+ * Returns: 2 = both trigrams match, 1 = one trigram matches, 0 = no match.
+ */
+export function getElementStrength(kingWen: number, elementName: string): number {
+  const hex = allHexagrams().find((h) => h.king_wen === kingWen);
+  if (!hex) return 0;
+  const bits = WU_XING_TRIGRAM_MAP[elementName] ?? [];
+  const upper = hex.binary.slice(0, 3);
+  const lower = hex.binary.slice(3, 6);
+  let count = 0;
+  if (bits.includes(upper)) count++;
+  if (bits.includes(lower)) count++;
+  return count;
 }
 
 // ---------------------------------------------------------------------------

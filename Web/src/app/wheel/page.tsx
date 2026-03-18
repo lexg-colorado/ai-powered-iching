@@ -39,6 +39,8 @@ import {
   filterByTrigramPair,
   getHexagramsByElement,
   getElementForHexagram,
+  getElementsForHexagram,
+  getElementStrength,
   getCompassTrigram,
   type HexagramRelationships,
   type TransformationInfo,
@@ -176,6 +178,28 @@ export default function WheelPage() {
     return getHexagramsByElement(activeElement);
   }, [mode, activeElement]);
 
+  // ── Reverse highlight: hexagram hover → inner trigrams + element (explore mode) ──
+  const hoveredHexTrigrams = useMemo(() => {
+    if (mode !== "explore" || selectedHex != null || hoveredHex == null) return undefined;
+    const hex = hexagrams.find((h) => h.king_wen === hoveredHex);
+    if (!hex) return undefined;
+    const upper = hex.binary.slice(0, 3);
+    const lower = hex.binary.slice(3, 6);
+    return upper === lower ? [upper] : [upper, lower];
+  }, [mode, selectedHex, hoveredHex, hexagrams]);
+
+  const hoveredHexElements = useMemo(() => {
+    if (mode !== "explore" || selectedHex != null || hoveredHex == null) return undefined;
+    const els = getElementsForHexagram(hoveredHex);
+    return els.length > 0 ? els : undefined;
+  }, [mode, selectedHex, hoveredHex]);
+
+  // ── Element hover in explore mode → highlight hexagrams on outer ring ──
+  const exploreElementHover = useMemo(() => {
+    if (mode !== "explore" || selectedHex != null || !hoveredElement) return [];
+    return getHexagramsByElement(hoveredElement);
+  }, [mode, selectedHex, hoveredElement]);
+
   // ── Build glyph state map ──
   const glyphStates = useMemo(() => {
     const states = new Map<number, GlyphState>();
@@ -184,6 +208,21 @@ export default function WheelPage() {
     if (highlightedTrigram && trigramHexagrams.size > 0 && selectedHex == null && mode === "explore") {
       for (const h of hexagrams) {
         states.set(h.king_wen, trigramHexagrams.has(h.king_wen) ? "highlighted" : "dimmed");
+      }
+      return states;
+    }
+
+    // Element hover in explore mode — highlight associated hexagrams with strength
+    if (exploreElementHover.length > 0 && selectedHex == null && mode === "explore" && hoveredElement) {
+      for (const h of hexagrams) {
+        const strength = getElementStrength(h.king_wen, hoveredElement);
+        if (strength === 2) {
+          states.set(h.king_wen, "highlighted");
+        } else if (strength === 1) {
+          states.set(h.king_wen, "highlighted_secondary");
+        } else {
+          states.set(h.king_wen, "dimmed");
+        }
       }
       return states;
     }
@@ -256,7 +295,7 @@ export default function WheelPage() {
     highlightedTrigram, trigramHexagrams,
     pathwaySteps, neighborsSource, neighborsData, maxNeighborDistance,
     trigramFilter, filteredHexagrams,
-    activeElement, elementHexagrams,
+    activeElement, elementHexagrams, exploreElementHover, hoveredElement,
     selectedCompassTrigram,
   ]);
 
@@ -508,9 +547,15 @@ export default function WheelPage() {
             rotation={drag.rotation}
             particleRef={particleRef}
             highlightedTrigram={highlightedTrigram}
+            highlightedTrigrams={hoveredHexTrigrams}
             selectedElement={mode === "elements" ? selectedElement : null}
-            hoveredElement={mode === "elements" ? hoveredElement : null}
-            elementsInteractive={mode === "elements"}
+            hoveredElement={
+              mode === "elements" ? hoveredElement
+              : mode === "explore" ? hoveredElement
+              : null
+            }
+            highlightedElements={hoveredHexElements}
+            elementsInteractive={mode === "elements" || mode === "explore"}
             onElementClick={handleElementClick}
             onElementHover={handleElementHover}
             onHexagramClick={handleHexagramClick}
@@ -569,7 +614,7 @@ export default function WheelPage() {
               const lowerBits = relationships.source.binary.slice(3, 6);
               const upper = getCompassTrigram("later", upperBits);
               const lower = getCompassTrigram("later", lowerBits);
-              const element = getElementForHexagram(relationships.source.king_wen);
+              const elements = getElementsForHexagram(relationships.source.king_wen);
               const elementColors: Record<string, string> = {
                 Fire: "#c4420a", Earth: "#b8860b", Metal: "#9ca3af", Water: "#2563eb", Wood: "#4a8b3f",
               };
@@ -590,12 +635,15 @@ export default function WheelPage() {
                     ))}
                   </div>
 
-                  {/* Wu Xing Element */}
+                  {/* Wu Xing Element(s) */}
                   <div className="mb-4 text-xs">
                     <span className="text-muted">Element: </span>
-                    <span className="font-medium" style={{ color: element ? elementColors[element] : undefined }}>
-                      {element ?? "—"}
-                    </span>
+                    {elements.length > 0 ? elements.map((el, i) => (
+                      <span key={el}>
+                        {i > 0 && <span className="text-muted">, </span>}
+                        <span className="font-medium" style={{ color: elementColors[el] }}>{el}</span>
+                      </span>
+                    )) : "—"}
                   </div>
 
                   {/* Compass Direction */}

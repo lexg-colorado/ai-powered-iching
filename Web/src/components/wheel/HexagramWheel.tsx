@@ -37,11 +37,15 @@ interface HexagramWheelProps {
   particleRef?: React.RefObject<ParticleCanvasHandle | null>;
   /** Currently highlighted trigram bits */
   highlightedTrigram?: string | null;
+  /** Additional highlighted trigrams (e.g., from hexagram hover) */
+  highlightedTrigrams?: string[];
   /** Optional viewBox override for zoom-to-selection */
   viewBoxOverride?: string;
   /** Wu Xing element interactivity */
   selectedElement?: string | null;
   hoveredElement?: string | null;
+  /** Additional highlighted elements (e.g., from hexagram hover) */
+  highlightedElements?: string[];
   elementsInteractive?: boolean;
   onElementClick?: (name: string) => void;
   onElementHover?: (name: string | null) => void;
@@ -63,9 +67,11 @@ export function HexagramWheel({
   rotation = 0,
   particleRef,
   highlightedTrigram,
+  highlightedTrigrams,
   viewBoxOverride,
   selectedElement,
   hoveredElement,
+  highlightedElements,
   elementsInteractive = false,
   onElementClick,
   onElementHover,
@@ -157,6 +163,7 @@ export function HexagramWheel({
             center={layout.center}
             scale={layout.glyphScale}
             highlightedTrigram={highlightedTrigram}
+            highlightedTrigrams={highlightedTrigrams}
             onTrigramHover={onTrigramHover}
             onTrigramClick={onTrigramClick}
           />
@@ -169,6 +176,7 @@ export function HexagramWheel({
             scale={layout.glyphScale}
             selectedElement={selectedElement}
             hoveredElement={hoveredElement}
+            highlightedElements={highlightedElements}
             interactive={elementsInteractive}
             onElementClick={onElementClick}
             onElementHover={onElementHover}

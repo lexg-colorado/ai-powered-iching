@@ -15,6 +15,8 @@ interface InnerRingProps {
   scale: number;
   /** Currently highlighted trigram bits (from hover) */
   highlightedTrigram?: string | null;
+  /** Additional highlighted trigrams (e.g., from hexagram hover showing upper+lower) */
+  highlightedTrigrams?: string[];
   onTrigramHover?: (bits: string | null) => void;
   onTrigramClick?: (bits: string) => void;
 }
@@ -25,6 +27,7 @@ function InnerRingInner({
   center,
   scale,
   highlightedTrigram,
+  highlightedTrigrams,
   onTrigramHover,
   onTrigramClick,
 }: InnerRingProps) {
@@ -52,7 +55,7 @@ function InnerRingInner({
           attribute={pos.attribute}
           angleDeg={pos.angleDeg}
           scale={scale * 1.2}
-          highlighted={highlightedTrigram === pos.bits}
+          highlighted={highlightedTrigram === pos.bits || highlightedTrigrams?.includes(pos.bits) === true}
           onClick={onTrigramClick ? () => onTrigramClick(pos.bits) : undefined}
           onMouseEnter={onTrigramHover ? () => onTrigramHover(pos.bits) : undefined}
           onMouseLeave={onTrigramHover ? () => onTrigramHover(null) : undefined}

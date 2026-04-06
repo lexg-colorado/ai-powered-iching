@@ -15,8 +15,8 @@ if not os.path.isabs(CHROMA_PATH):
 DEFAULT_COLLECTION = os.getenv("DEFAULT_COLLECTION", "iching_toc_test")
 
 # Token budgets — thinking models need much more headroom
-MAX_TOKENS = int(os.getenv("LM_STUDIO_MAX_TOKENS", "4096"))
-THINKING_MAX_TOKENS = int(os.getenv("LM_STUDIO_THINKING_MAX_TOKENS", "16384"))
+MAX_TOKENS = int(os.getenv("LM_STUDIO_MAX_TOKENS", "2048"))
+THINKING_MAX_TOKENS = int(os.getenv("LM_STUDIO_THINKING_MAX_TOKENS", "8192"))
 
 # Known thinking model name patterns
 _THINKING_PATTERNS = ("qwen3", "deepseek-r1", "deepseek-reasoner")

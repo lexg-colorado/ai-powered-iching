@@ -299,6 +299,28 @@ def load_wing_text(king_wen: int) -> WingText | None:
 # Standalone Wing documents
 # ---------------------------------------------------------------------------
 
+# Map trigram parenthetical names (from king_wen_sequence.json) to Shuo Kua names
+_TRIGRAM_TO_SHUO_KUA = {
+    "heaven": "The Creative",
+    "earth": "The Receptive",
+    "thunder": "The Arousing",
+    "wind": "The Gentle",
+    "wood": "The Gentle",
+    "water": "The Abysmal",
+    "fire": "The Clinging",
+    "mountain": "Keeping Still",
+    "lake": "The Joyous",
+}
+
+
+def _extract_shuo_kua_trigram_name(trigram_field: str) -> str | None:
+    """Extract the Shuo Kua name from a trigram field like "Ch'ien (Heaven)"."""
+    m = re.search(r'\((\w+)\)', trigram_field)
+    if m:
+        return _TRIGRAM_TO_SHUO_KUA.get(m.group(1).lower())
+    return None
+
+
 def get_shuo_kua() -> str:
     """Load the Shuo Kua (Discussion of the Trigrams) as a single string."""
     global _shuo_kua_text
@@ -309,6 +331,57 @@ def get_shuo_kua() -> str:
         else:
             _shuo_kua_text = ""
     return _shuo_kua_text
+
+
+def get_shuo_kua_for_trigrams(trigram_names: set[str]) -> str:
+    """Return a filtered Shuo Kua excerpt containing only relevant trigrams.
+
+    Args:
+        trigram_names: Set of Shuo Kua-style names like "The Creative", "The Joyous".
+    """
+    full_text = get_shuo_kua()
+    if not full_text or not trigram_names:
+        return ""
+
+    # Sections 7-10 are compact lists — include them in full (they're short)
+    ch3_marker = "#### CHAPTER III"
+    ch3_idx = full_text.find(ch3_marker)
+    if ch3_idx == -1:
+        return ""
+
+    # Find section 11 (Additional Symbols) — this is the bulk we want to filter
+    sec11_marker = "#### 11. Additional Symbols"
+    sec11_idx = full_text.find(sec11_marker)
+    if sec11_idx == -1:
+        # No section 11 found, just return compact sections
+        return full_text[ch3_idx:]
+
+    # Compact sections (7-10): include in full
+    compact = full_text[ch3_idx:sec11_idx].strip()
+
+    # Section 11: filter to only relevant trigrams
+    sec11_text = full_text[sec11_idx:]
+    # Remove the trailing "---" separator if present
+    if sec11_text.rstrip().endswith("---"):
+        sec11_text = sec11_text.rstrip()[:-3].rstrip()
+
+    # Split section 11 into paragraphs (double newline separated)
+    # Each trigram block starts with "The Creative is...", "The Receptive is...", etc.
+    paragraphs = re.split(r'\n\n+', sec11_text)
+    header = paragraphs[0] if paragraphs else ""  # "#### 11. Additional Symbols"
+
+    filtered_paras = [header]
+    for para in paragraphs[1:]:
+        for name in trigram_names:
+            if para.strip().startswith(name):
+                filtered_paras.append(para)
+                break
+
+    if len(filtered_paras) <= 1:
+        # No matching paragraphs, skip section 11 entirely
+        return compact
+
+    return compact + "\n\n" + "\n\n".join(filtered_paras)
 
 
 def get_reading_guide() -> str:
@@ -435,14 +508,14 @@ def get_reading_passages(cast: CastResult) -> dict[str, list[dict]]:
 
     primary = cast.primary
 
-    # 1. Primary hexagram: Overview + Judgment + Image
+    # 1. Primary hexagram: Judgment + Image
     passages["primary"] = _hex_passages(
-        primary.king_wen, ["overview", "judgment", "image"],
+        primary.king_wen, ["judgment", "image"],
     )
 
-    # 1b. Primary Wings: T'uan Chuan + Tsa Kua
+    # 1b. Primary Wings: T'uan Chuan + Image Commentary + Tsa Kua
     passages["primary_wings"] = _wing_passages(
-        primary.king_wen, ["tuan_chuan", "miscellaneous", "sequence"],
+        primary.king_wen, ["tuan_chuan", "image_commentary", "miscellaneous"],
     )
 
     # 2. Changing lines
@@ -486,7 +559,7 @@ def get_reading_passages(cast: CastResult) -> dict[str, list[dict]]:
     # 4. Nuclear hexagram of primary
     if cast.nuclear:
         passages["nuclear_primary"] = _hex_passages(
-            cast.nuclear.king_wen, ["overview", "judgment"],
+            cast.nuclear.king_wen, ["judgment"],
         )
 
     # 5. Nuclear hexagram of relating
@@ -494,13 +567,13 @@ def get_reading_passages(cast: CastResult) -> dict[str, list[dict]]:
         rel_nuc = nuclear_hexagram(cast.relating.binary)
         if rel_nuc and (not cast.nuclear or rel_nuc.king_wen != cast.nuclear.king_wen):
             passages["nuclear_relating"] = _hex_passages(
-                rel_nuc.king_wen, ["overview", "judgment"],
+                rel_nuc.king_wen, ["judgment"],
             )
 
     # 6. Zong Gua (complement) of primary
     if cast.zong_gua:
         passages["zong_gua"] = _hex_passages(
-            cast.zong_gua.king_wen, ["overview", "judgment"],
+            cast.zong_gua.king_wen, ["judgment"],
         )
 
     return passages

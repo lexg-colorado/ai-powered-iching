@@ -389,6 +389,10 @@ def _build_system_prompt(q_type: str) -> str:
         "directly addresses their question with concrete, practical guidance drawn from "
         "all layers of the reading. Omit this section if no question was asked.\n\n"
         "Principles:\n"
+        "- Keep the reading focused and concise — aim for 800–1200 words total. "
+        "Synthesize passage meanings in your own words; do not exhaustively quote source texts.\n"
+        "- Each section should be a tight paragraph or two, not a multi-paragraph essay. "
+        "For nuclear and Zong Gua sections, keep each to 2–3 sentences.\n"
         "- Always start from the hexagram source texts. The Wings deepen and explain.\n"
         "- Use the T'uan Chuan and Hsiang Chuan as interpretive backbone.\n"
         "- Use trigram symbolism from the Shuo Kua when it enriches interpretation.\n"
@@ -409,7 +413,7 @@ def _build_system_prompt(q_type: str) -> str:
         "Step 3: COMMIT to your answer. Open with a single bold heading: "
         "'## Yes', '## No', '## Yes, but...', '## No, unless...', or '## Not yet'. "
         "Do NOT hedge or soften. The hexagram has spoken.\n"
-        "Step 4: Follow with a condensed explanation drawing from Judgment, changing "
+        "Step 4: Follow with a condensed explanation (400–600 words) drawing from Judgment, changing "
         "lines, and relating hexagram to explain WHY. Keep it focused and direct.\n"
         "Step 5: Do NOT include nuclear hexagram or Zong Gua sections.\n"
         "Step 6: End with a brief '### Counsel' section.\n\n"
@@ -440,6 +444,10 @@ def _build_system_prompt(q_type: str) -> str:
         "they asked the Oracle to speak to a subject. End the reading with the final "
         "hexagram layer (Zong Gua, or nuclear if no Zong Gua is provided).\n\n"
         "Principles:\n"
+        "- Keep the reading focused and concise — aim for 800–1200 words total. "
+        "Synthesize passage meanings in your own words; do not exhaustively quote source texts.\n"
+        "- Each section should be a tight paragraph or two, not a multi-paragraph essay. "
+        "For nuclear and Zong Gua sections, keep each to 2–3 sentences.\n"
         "- The Oracle speaks to the subject with authority, not as if answering a question.\n"
         "- Illuminate rather than advise. Describe the nature, dynamics, and trajectory.\n"
         "- Always start from the hexagram source texts. The Wings deepen and explain.\n"
@@ -479,31 +487,32 @@ def _build_system_prompt(q_type: str) -> str:
     return base_prompt
 
 
-def _build_shuo_kua_context() -> str:
-    """Load the essential trigram reference from the Shuo Kua (Chapter III).
+def _build_shuo_kua_context(cast: CastResult) -> str:
+    """Load a filtered Shuo Kua trigram reference for the cast's trigrams.
 
-    Skips the philosophical Chapters I and II to save context tokens.
-    Chapter III contains the practical trigram symbols: attributes, animals,
-    body parts, family relationships, and detailed symbolic associations.
+    Only includes the trigrams actually present in the primary and relating
+    hexagrams, rather than sending all 8 trigrams every time.
     """
-    shuo_kua = hexagram_text.get_shuo_kua()
-    if not shuo_kua:
+    # Collect unique trigram names from the cast
+    trigram_names: set[str] = set()
+    for hex_info in [cast.primary, cast.relating]:
+        if hex_info is None:
+            continue
+        for field in [hex_info.upper_trigram, hex_info.lower_trigram]:
+            name = hexagram_text._extract_shuo_kua_trigram_name(field)
+            if name:
+                trigram_names.add(name)
+
+    if not trigram_names:
         return ""
 
-    # Extract from Chapter III onwards (the practical trigram reference)
-    ch3_marker = "#### CHAPTER III"
-    ch3_idx = shuo_kua.find(ch3_marker)
-    if ch3_idx != -1:
-        trimmed = shuo_kua[ch3_idx:]
-    else:
-        # Fallback: try to find the attributes section directly
-        attr_marker = "#### 7. The Attributes"
-        attr_idx = shuo_kua.find(attr_marker)
-        trimmed = shuo_kua[attr_idx:] if attr_idx != -1 else shuo_kua
+    filtered = hexagram_text.get_shuo_kua_for_trigrams(trigram_names)
+    if not filtered:
+        return ""
 
     return (
         "\n\n--- Trigram Reference: Shuo Kua (Discussion of the Trigrams) ---\n"
-        + trimmed
+        + filtered
     )
 
 
@@ -592,8 +601,8 @@ def build_interpretation_prompt(
     # Build system prompt with reading guide
     system_prompt = _build_system_prompt(q_type)
 
-    # Add Shuo Kua as trigram reference context
-    system_prompt += _build_shuo_kua_context()
+    # Add Shuo Kua as trigram reference context (filtered to relevant trigrams)
+    system_prompt += _build_shuo_kua_context(cast)
 
     # Build user message
     user_content = f"Cast result:\n"

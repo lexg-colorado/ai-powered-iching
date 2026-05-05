@@ -6,6 +6,7 @@
  */
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import { API_BASE } from "@/lib/api";
 
 export interface TextSection {
   heading: string;
@@ -24,8 +25,6 @@ interface UseHexagramTextCacheResult {
   loading: boolean;
   error: string | null;
 }
-
-const API_BASE = "http://localhost:8000";
 
 /**
  * Parse the API response passages into structured text sections.

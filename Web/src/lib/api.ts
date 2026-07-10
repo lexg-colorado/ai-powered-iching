@@ -58,6 +58,7 @@ export async function listCollections(): Promise<CollectionInfo[]> {
 
 export interface ReadingStreamCallbacks {
   onMeta: (data: { cast: CastResponse; header: string }) => void;
+  onQueued?: (message: string) => void;
   onThinking: (text: string) => void;
   onThinkingDone: () => void;
   onToken: (text: string) => void;
@@ -92,6 +93,11 @@ export async function getReadingStream(
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  // currentEvent must persist across reader.read() iterations: a network chunk
+  // boundary can fall between an SSE "event:" line and its "data:" line, and if
+  // this reset each read, such split events would be silently dropped (curl
+  // rarely splits them; a real browser connection frequently does).
+  let currentEvent = "";
 
   while (true) {
     const { done, value } = await reader.read();
@@ -101,7 +107,6 @@ export async function getReadingStream(
     const lines = buffer.split("\n");
     buffer = lines.pop()!; // keep incomplete line in buffer
 
-    let currentEvent = "";
     for (const line of lines) {
       if (line.startsWith("event: ")) {
         currentEvent = line.slice(7).trim();
@@ -111,6 +116,9 @@ export async function getReadingStream(
           switch (currentEvent) {
             case "meta":
               callbacks.onMeta(data);
+              break;
+            case "queued":
+              callbacks.onQueued?.(data.message);
               break;
             case "thinking":
               callbacks.onThinking(data.text);
